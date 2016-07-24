@@ -409,6 +409,17 @@ class BaseForm extends Validator{
 	 * @return 	array 	the fetched form data
 	 */
 	public function fetch_form_data(){
+		if($this->_sFormSubmitMethod === 'POST'){
+			if(!isset($_POST[$this->_sFormId])){
+				return [];
+			}
+		}
+		if($this->_sFormSubmitMethod === 'GET'){
+			if(!isset($_GET[$this->_sFormId])){
+				return [];
+			}
+		}
+
 		// get raw form data, from $_POST/$_GET
 		$aFormData = 
 			$this->_sFormSubmitMethod === 'POST'
