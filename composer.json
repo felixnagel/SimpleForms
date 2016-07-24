@@ -1,0 +1,21 @@
+{
+    "name": "luckynail/simple-forms",
+    "description": "",
+    "license": "MIT",
+    "keywords": ["forms", "quick", "simple"],
+    "authors": [
+        {
+            "name": "Felix Nagel",
+            "email": "ElfixLange@gmail.com"
+        }
+    ],
+    "require": {
+        "luckynail/simple": "0.0.*"
+    },
+    "require-dev": {},
+    "autoload": {
+        "psr-4": {
+            "LuckyNail\\SimpleForms\\": "src"
+        }
+    }
+}
