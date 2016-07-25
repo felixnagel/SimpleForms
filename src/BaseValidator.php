@@ -249,10 +249,6 @@ abstract class BaseValidator{
 				$sVldtrName, $mInputValue, $mVldtrParams, $sFieldId
 			);
 
-			dump($sVldtrName);
-			dump($bIsValid);
-
-
 			// if validator is negated, negate its result
 			if($iNegation){
 				$bIsValid = !$bIsValid;
