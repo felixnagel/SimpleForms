@@ -115,6 +115,13 @@ class BaseForm extends Validator{
 	private $_sIsSubmittedKey = '::is_submitted';
 	
 	/**
+	 * Callback to manipulate inner html output, for example for the sake of i18n.
+	 * This callback must return the manipulated inner html as string.
+	 * @var callable
+	 */
+	protected $_innerHtmlCallback;
+
+	/**
 	 * Html templates for different tags.
 	 * @var array
 	 */
@@ -204,6 +211,13 @@ class BaseForm extends Validator{
 		}
 		if(isset($aSettings['whitelist'])){
 			$this->add_whitelisted_fields($aSettings['whitelist']);
+		}
+		if(
+			isset($aSettings['inner_html_callback'])
+			&&
+			is_callable($aSettings['inner_html_callback'])
+		){
+			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
 		}
 
 		$this->fetch_form_data();
@@ -481,14 +495,6 @@ class BaseForm extends Validator{
 
 		// handle special html tags...
 
-		// ...html tags that contain their values as inner html (textarea)
-		if($sType === 'textarea'){
-			// put its value as inner html if none is defined
-			if(!$sInnerHtml){
-				$sInnerHtml = $this->_get_field_input($sFieldId);
-			}
-		}	
-
 		// ...html tags that may contain option tags (datalist, optgroup, select)
 		if(in_array($sType, ['datalist', 'optgroup', 'select'])){
 			foreach($aOptions as $sCaption => $sValue){
@@ -498,15 +504,40 @@ class BaseForm extends Validator{
 					$aSettings = ['label' => $sCaption, 'options' => $sValue];
 					$sInnerHtml .= $this->field($sFieldId, 'optgroup', $aSettings);
 				}else{
+					if(is_int($sCaption)){
+						$sCaption = $sValue;
+					}
 					// setup settings, then call ->field() to generate option html tag
 					$aSettings = ['html' => $sCaption, 'value' => $sValue];
 					$sInnerHtml .= $this->field($sFieldId, 'option', $aSettings);
 				}
 			}
 		}
-		
+
+		// execute inner html callback for specific tags, if available
+		if(
+			$sInnerHtml !== false
+			&&
+			is_callable($this->_innerHtmlCallback)
+			&&
+			in_array($sType, ['option', 'label', 'textarea'])
+		){
+			$sInnerHtml = call_user_func_array(
+				$this->_innerHtmlCallback,
+				[$this->_sFormId, $sFieldId, $sType, $sInnerHtml]
+			);
+		}	
+
+		// ...html tags that contain their values as inner html (textarea)
+		if($sType === 'textarea'){
+			// put its value as inner html if none is defined
+			if($sValue = $this->_get_field_input($sFieldId)){
+				$sInnerHtml = $sValue;
+			}
+		}	
+
 		// ...html tags with inner html that should be escaped (option, textarea)
-		if(in_array($sType, ['option', 'textarea'])){
+		if(in_array($sType, ['label', 'option', 'textarea'])){
 			$sInnerHtml = $this->_escape($sInnerHtml);
 		}
 
