@@ -166,6 +166,19 @@ abstract class BaseValidator{
 	 * @return 	boolean 				is valid flag
 	 */
 	protected function _execute_validator($sVldtrName, $mInputValue, $mVldtrParams, $sFieldId){
+		// check each param for field value references and replace them by its referenced value
+		if(is_array($mVldtrParams)){
+			foreach($mVldtrParams as $iKey => $mValue){
+				if($sFieldKey = $this->_get_masked_field_reference($mValue)){
+					$mVldtrParams[$iKey] = $this->ads_get($this->_aData, $sFieldKey, null);
+				}
+			}
+		}else{
+			if($sFieldKey = $this->_get_masked_field_reference($mVldtrParams)){
+				$mVldtrParams = $this->ads_get($this->_aData, $sFieldKey, null);
+			}
+		}
+
 		// check if given validator name refers to a default validator
 		$sExistingVldtr	= '__validator__' . $sVldtrName;
 		if(method_exists($this, $sExistingVldtr)){
@@ -236,6 +249,10 @@ abstract class BaseValidator{
 				$sVldtrName, $mInputValue, $mVldtrParams, $sFieldId
 			);
 
+			dump($sVldtrName);
+			dump($bIsValid);
+
+
 			// if validator is negated, negate its result
 			if($iNegation){
 				$bIsValid = !$bIsValid;
@@ -293,4 +310,29 @@ abstract class BaseValidator{
 			unset($this->_aVldtrs[$sFieldId]);
 		}
 	}
+
+	/**
+	 * Check if filter param is a masked form field reference and return its unmasked id or
+	 * otherwise return false.
+	 * @param  string 	$sFieldId 	form field id
+	 * @return mixed				unmasked form field reference id or false
+	 */
+	protected function _get_masked_field_reference($sFieldId){
+		$sPattern = '=^~\{(.+?)\}~$=';
+		if(is_string($sFieldId) && preg_match($sPattern, $sFieldId)){
+			return preg_replace($sPattern, '$1', $sFieldId);
+		}
+		return false;
+	}
+
+	/**
+	 * Mask a form field reference id by using delimiters.
+	 * @param  string 	$sFieldId 	form field id
+	 * @return string         		created masked form field reference
+	 */
+	protected function _mask_field_reference($sFieldId){
+		return sprintf('~{%s}~', $sFieldId);
+	}
+
+
 }

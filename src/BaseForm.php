@@ -293,7 +293,7 @@ class BaseForm extends Validator{
 	 */
 	public function attr($sFieldId, $sType, $aAttr = []){
 		// if defined, merge given attributes with set up default attributes
-		if($this->_aDefaultAttr[$sFieldId]){
+		if(isset($this->_aDefaultAttr[$sFieldId])){
 			$aAttr = $this->_array_merge_recursive_ex($this->_aDefaultAttr[$sFieldId], $aAttr);
 		}
 
@@ -428,10 +428,12 @@ class BaseForm extends Validator{
 		;
 
 		// get additional data from $_FILES and put them into form data
-		$aFileData = $_FILES[$this->_sFormId];
-		foreach($aFileData as $sFileKey => $aFields){
-			foreach($aFields as $sField => $sValue){
-				$aFormData[$sField][$sFileKey] = $sValue;
+		if(isset($_FILES[$this->_sFormId])){
+			$aFileData = $_FILES[$this->_sFormId];
+			foreach($aFileData as $sFileKey => $aFields){
+				foreach($aFields as $sField => $sValue){
+					$aFormData[$sField][$sFileKey] = $sValue;
+				}
 			}
 		}
 
@@ -629,6 +631,16 @@ class BaseForm extends Validator{
 	 */
 	public function overwrite_input($aData){
 		$this->_aFormData = $this->_array_merge_recursive_ex($this->_aFormData, $aData);
+	}
+
+	/**
+	 * Clears data of a form field.
+	 * @param  [type] $sFieldId [description]
+	 */
+	public function clear_field_input($sFieldId){
+		if(isset($this->_aFormData[$sFieldId])){
+			unset($this->_aFormData[$sFieldId]);
+		}
 	}
 
 	/**
@@ -863,20 +875,6 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Check if filter param is a masked form field reference and return its unmasked id or
-	 * otherwise return false.
-	 * @param  string 	$sFieldId 	form field id
-	 * @return mixed				unmasked form field reference id or false
-	 */
-	private function _get_masked_field_reference($sFieldId){
-		$sPattern = '=^~\{(.+?)\}~$=';
-		if(is_string($sFieldId) && preg_match($sPattern, $sFieldId)){
-			return preg_replace($sPattern, '$1', $sFieldId);
-		}
-		return false;
-	}
-
-	/**
 	 * Check if filter callable is a masked filter name and return its unmasked name or otherwise
 	 * return false.
 	 * @param   $sFilter 	filter callable name
@@ -889,14 +887,4 @@ class BaseForm extends Validator{
 		}
 		return false;
 	}
-
-	/**
-	 * Mask a form field reference id by using delimiters.
-	 * @param  string 	$sFieldId 	form field id
-	 * @return string         		created masked form field reference
-	 */
-	private function _mask_field_reference($sFieldId){
-		return sprintf('~{%s}~', $sFieldId);
-	}
-
 }

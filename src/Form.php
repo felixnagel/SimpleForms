@@ -11,6 +11,10 @@ class Form extends BaseForm{
 		return preg_replace('=[^0-9]=', '', $sValue);
 	}
 
+	protected function __filter__encrypt($sString, $iStrength = 4){
+		return password_hash($sString, PASSWORD_BCRYPT, array('cost' => $iStrength));
+	}
+
 	/**
 	 * Default form filter: Normalizes the Name of a person.
 	 * @param 	string 	$sName	form field value
