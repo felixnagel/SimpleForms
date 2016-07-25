@@ -206,10 +206,16 @@ abstract class BaseValidator{
 	 */
 	protected function _insert_error_message($sFieldId, $sVldtrName, $mVldtrParams){
 		// check if there is a more specific error message specified with array dor syntax
-		$sMessage =
-			isset($this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName])
-			? $this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName]
-			: $this->_aVldtrErrMsg[$sVldtrName];
+		$sMessage = $sFieldId.'.'.$sVldtrName;
+		if(isset($this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName])){
+			$sMessage = $this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName];
+		}
+		elseif(isset($this->_aVldtrErrMsg[$sFieldId])){
+			$sMessage = $this->_aVldtrErrMsg[$sFieldId];
+		}
+		elseif(isset($this->_aVldtrErrMsg[$sVldtrName])){
+			$sMessage = $this->_aVldtrErrMsg[$sVldtrName];
+		}
 
 		// cast validator parameters to string in order to be able to print them as part of the
 		// error message
@@ -252,6 +258,7 @@ abstract class BaseValidator{
 			// if validator is negated, negate its result
 			if($iNegation){
 				$bIsValid = !$bIsValid;
+				$sVldtrName = '!'.$sVldtrName;
 			}
 
 			// if validator result is negative, set field validation to false and add an error
