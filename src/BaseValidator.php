@@ -210,9 +210,6 @@ abstract class BaseValidator{
 		if(isset($this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName];
 		}
-		elseif(isset($this->_aVldtrErrMsg[$sFieldId])){
-			$sMessage = $this->_aVldtrErrMsg[$sFieldId];
-		}
 		elseif(isset($this->_aVldtrErrMsg[$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sVldtrName];
 		}
@@ -336,6 +333,4 @@ abstract class BaseValidator{
 	protected function _mask_field_reference($sFieldId){
 		return sprintf('~{%s}~', $sFieldId);
 	}
-
-
 }

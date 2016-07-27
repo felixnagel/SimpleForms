@@ -128,6 +128,7 @@ class BaseForm extends Validator{
 	protected $_aFieldProtos = [
 		'datalist' => '<datalist %s>%s</datalist>',
 		'default'  => '<input %s/>',
+		'error'    => '<span %s>%s</span>',
 		'label'    => '<label %s>%s</label>',
 		'optgroup' => '<optgroup %s>%s</optgroup>',
 		'option'   => '<option %s>%s</option>',
@@ -390,13 +391,12 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Print html error message. This comes along with a default span-Tag but may be differred by
-	 * specifying the optional parameter $sHtmlProto.
+	 * Print html error message.
 	 * @param	string	$sFieldId	form field id error is related to
-	 * @param	array	$aAttr		associative array of tag attributes
+	 * @param	array	$aSettings	associative array of tag attributes
 	 * @return	string				generated HTML string
 	 */
-	public function error($sFieldId, $aAttr = [], $sHtmlProto = '<span %s>%s</span>'){
+	public function error($sFieldId, $aSettings = []){
 		// no error output when..
 		// ... form is not submitted or valid
 		if(!$this->is_submitted() || $this->is_valid()){
@@ -404,18 +404,14 @@ class BaseForm extends Validator{
 		}
 		// ... or specified field is valid
 		// NOTE: following line will trigger validation process (if form has been submitted)
-		if(!$aErrors = $this->get_errors()[$sFieldId]){
+		$aErrors = $this->get_errors();
+		if(!isset($aErrors[$sFieldId])){
 			return '';
 		}
-		
-		// create error attribute string
-		$sAttr = $this->attr($sFieldId, 'error', $aAttr);
-		
-		// get generated error message
-		$sErrorMsg = $this->_escape(array_shift($aErrors));
-		
-		// return full error html tag as string
-		return sprintf($sHtmlProto, $sAttr, $sErrorMsg);
+
+		// get and return html		
+		$aSettings['html'] = array_shift($aErrors[$sFieldId]);
+		return $this->field($sFieldId, 'error', $aSettings);
 	}
 
 	/**
@@ -489,7 +485,7 @@ class BaseForm extends Validator{
 		}else{
 			$sHtml = $this->_aFieldProtos[$sType];
 		}
-		
+
 		// generate attributes and put them into html tag
 		$sHtml = sprintf($sHtml, $this->attr($sFieldId, $sType, $aAttr), '%s');
 
@@ -515,12 +511,19 @@ class BaseForm extends Validator{
 		}
 
 		// execute inner html callback for specific tags, if available
+		// @todo 	#REMOVE?
+		// $sInnerHtml !== false
 		if(
 			$sInnerHtml !== false
 			&&
 			is_callable($this->_innerHtmlCallback)
 			&&
-			in_array($sType, ['option', 'label', 'textarea'])
+			in_array($sType, [
+				'error',
+				'label',
+				'option',
+				'textarea',
+			])
 		){
 			$sInnerHtml = call_user_func_array(
 				$this->_innerHtmlCallback,
@@ -542,9 +545,18 @@ class BaseForm extends Validator{
 		}
 
 		// set inner html and return generated html tag as string
-		if(in_array($sType, ['datalist', 'label', 'optgroup', 'option', 'select', 'textarea'])){
+		if(in_array($sType, [
+			'datalist',
+			'error',
+			'label',
+			'optgroup',
+			'option',
+			'select',
+			'textarea',
+		])){
 			$sHtml = sprintf($sHtml, $sInnerHtml);
 		}
+
 		return $sHtml;
 	}
 
