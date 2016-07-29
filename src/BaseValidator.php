@@ -86,19 +86,18 @@ abstract class BaseValidator{
 	 * @return	array 	invalid form field errors
 	 */
 	public function get_errors(){
-		$this->_validate_once();
 		return $this->_aErrors;
 	}
 
 	/**
-	 * Adds custom error messages.
-	 * @param	string 	$sVldtrName  	name of validator this error message will be associated
-	 *                              	with
-	 * @param 	string 	$sVldtrErrMsg 	error message string, may contain %s placeholder for 	
-	 *                                	sprintf(), where validator param values will be inserted
+	 * Adds custom error messages. Example array structure: [
+	 * 		'required' => 'Fill this field, please.',
+	 * 		'drinks.!eq' => 'Dont drink beer, it\'s unhealthy!',
+	 * 	]
+	 * @param	array 	$aErrorMessages		array of error messages
 	 */
-	public function add_error_messages($sVldtrName, $sVldtrErrMsg){
-		$this->_aVldtrErrMsg = array_merge($this->_aVldtrErrMsg, [$sVldtrName => $sVldtrErrMsg]);
+	public function add_error_messages($aErrorMessages){
+		$this->_aVldtrErrMsg = array_merge($this->_aVldtrErrMsg, $aErrorMessages);
 	}
 
 	/**

@@ -251,6 +251,19 @@ class BaseForm extends Validator{
 		}
 	}
 
+	public function get_error_messages($bInnerHtmlCallback = false){
+		if(!$bInnerHtmlCallback){
+			return $this->_aVldtrErrMsg;
+		}
+		$aResult = [];
+		foreach($this->_aVldtrErrMsg as $sKey => $sMessage){
+			$aResult[$sKey] = call_user_func_array(
+				$this->_innerHtmlCallback, [$this->_sFormId, 'error', $sMessage]
+			);
+		}
+		return $aResult;
+	}
+
 	/**
 	 * Add any number of field filters.
 	 * @param 	array 	$aSettings 	Filter definition, see property description of $_aFieldFilters
@@ -527,7 +540,7 @@ class BaseForm extends Validator{
 		){
 			$sInnerHtml = call_user_func_array(
 				$this->_innerHtmlCallback,
-				[$this->_sFormId, $sFieldId, $sType, $sInnerHtml]
+				[$this->_sFormId, $sType, $sInnerHtml]
 			);
 		}	
 
@@ -603,15 +616,6 @@ class BaseForm extends Validator{
 	 */
 	public function get_error_class(){
 		return $this->is_valid() ? '' : $this->_sCssErrorClass;
-	}
-
-	/**
-	 * Get form errors.
-	 * @return	array	array with field errors (all error messages of invalid fields)
-	 */
-	public function get_errors(){
-		$this->set_data($this->filter());
-		return parent::get_errors();
 	}
 
 	/**

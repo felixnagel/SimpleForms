@@ -4,22 +4,22 @@ namespace LuckyNail\SimpleForms;
 
 class Validator extends BaseValidator{
 	protected $_aVldtrErrMsg = [
-		'array'       => 'VALIDATOR_ARRAY %s',
-		'date'        => 'VALIDATOR_DATE %s',
-		'date_after'  => 'VALIDATOR_DATE_AFTER %s',
-		'date_before' => 'VALIDATOR_DATE_BEFORE %s',
+		'array'       => 'VALIDATOR_ARRAY',
+		'date'        => 'VALIDATOR_DATE',
+		'date_after'  => 'VALIDATOR_DATE_AFTER',
+		'date_before' => 'VALIDATOR_DATE_BEFORE',
 		'email'       => 'VALIDATOR_EMAIL',
-		'eq'          => 'VALIDATOR_EQUAL %s',
-		'eq_strict'   => 'VALIDATOR_EQUAL_STRICT %s',
-		'fl_range'    => 'VALIDATOR_FLOAT_RANGE %s',
-		'imagetype'   => 'VALIDATOR_IMAGETYPE %s',
-		'in'          => 'VALIDATOR_IN %s',
-		'in_strict'   => 'VALIDATOR_IN_STRICT %s',
+		'eq'          => 'VALIDATOR_EQUAL',
+		'eq_strict'   => 'VALIDATOR_EQUAL_STRICT',
+		'fl_range'    => 'VALIDATOR_FL_RANGE',
+		'imagetype'   => 'VALIDATOR_IMAGETYPE',
+		'in'          => 'VALIDATOR_IN',
+		'in_strict'   => 'VALIDATOR_IN_STRICT',
 		'int'         => 'VALIDATOR_INT',
-		'numeric'     => 'VALIDATOR_NUMERIC %s',
-		'regex'       => 'VALIDATOR_REGEX %s',
+		'numeric'     => 'VALIDATOR_NUMERIC',
+		'regex'       => 'VALIDATOR_REGEX',
 		'required'    => 'VALIDATOR_REQUIRED',
-		'str_range'   => 'VALIDATOR_STRING_RANGE %s',
+		'strlen'      => 'VALIDATOR_STRING_RANGE',
 		'upload'      => 'VALIDATOR_UPLOAD',
 		'url'         => 'VALIDATOR_URL',
 	];
@@ -153,9 +153,13 @@ class Validator extends BaseValidator{
 	protected function __validator__required($sValue){
 		return !($sValue === null || $sValue === '' || !count($sValue));
 	}
-	protected function __validator__str_range($sValue, $sInterval){
+	protected function __validator__strlen($sValue, $sInterval){
+		if(is_numeric($sInterval)){
+			return strlen($sValue) == $sInterval;
+		}
 		if(preg_match_all('=^(\d*)\s*\,\s*(\d*)$=', $sInterval, $aMatches)){
 			$iMin = (int)$aMatches[1][0];
+			Core_Debug::dump($sValue);
 			if($iMin){
 				if(strlen($sValue) < $iMin){
 					return false;
