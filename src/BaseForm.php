@@ -3,7 +3,7 @@
 namespace LuckyNail\SimpleForms;
 
 class BaseForm extends Validator{
-	/**
+/**
 	 * Form Id. Will be printed into id-attribute and be used as name for form data array.
 	 * @var	string
 	 */
@@ -180,6 +180,8 @@ class BaseForm extends Validator{
 		'week'           => ['class', 'id', 'name', 'type', 'value',],
 	];
 
+	private $_sEncoding = 'utf-8';
+
 	/**
 	 * An optional settings array may be passed to skip additional
 	 * setter method calls. All settings might be done later using the specific
@@ -220,7 +222,9 @@ class BaseForm extends Validator{
 		){
 			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
 		}
-
+		if(isset($aSettings['encoding'])){
+			$this->_sEncoding = $aSettings['encoding'];
+		}
 		$this->fetch_form_data();
 	}
 
@@ -857,7 +861,7 @@ class BaseForm extends Validator{
 	 * @return	string			escaped string.
 	 */
 	private function _escape($sS) {
-		return htmlspecialchars($sS, ENT_QUOTES, 'utf-8');
+		return htmlspecialchars($sS, ENT_QUOTES, $this->_sEncoding);
 	}
 
 	/**
