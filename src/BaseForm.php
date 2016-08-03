@@ -3,7 +3,7 @@
 namespace LuckyNail\SimpleForms;
 
 class BaseForm extends Validator{
-/**
+	/**
 	 * Form Id. Will be printed into id-attribute and be used as name for form data array.
 	 * @var	string
 	 */
@@ -189,22 +189,36 @@ class BaseForm extends Validator{
 	 * 
 	 * @param array 	$aSettings 	Associative array with all property values to be passed to
 	 * their respective setter methods. Possible keys:
-	 * 	'enctype', 'filters', 'form_submit_method', 'id', 'token', 'validators', 'whitelist'
+	 * 	'default_values', 'encoding', 'enctype', 'form_submit_method', 'filters', 'id',
+	 * 	'inner_html_callback', 'token', 'validators', 'whitelist'
 	 */
 	public function __construct($aSettings = []){
+		if(isset($aSettings['default_values'])){
+			$this->add_default_values($aSettings['default_values']);
+		}
+		if(isset($aSettings['encoding'])){
+			$this->_sEncoding = $aSettings['encoding'];
+		}
 		if(isset($aSettings['enctype'])){
 			$this->set_enctype($aSettings['enctype']);
 		}
-		if(isset($aSettings['filters'])){
-			$this->add_filters($aSettings['filters']);
-		}
 		if(isset($aSettings['form_submit_method'])){
 			$this->set_submit_method($aSettings['form_submit_method']);
+		}
+		if(isset($aSettings['filters'])){
+			$this->add_filters($aSettings['filters']);
 		}
 		if(isset($aSettings['id'])){
 			$this->set_id($aSettings['id']);
 		}else{
 			$this->_sFormId = 'form_'.++self::$_iFormCount;			
+		}
+		if(
+			isset($aSettings['inner_html_callback'])
+			&&
+			is_callable($aSettings['inner_html_callback'])
+		){
+			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
 		}
 		if(isset($aSettings['token'])){
 			$this->_sCrsfToken = $aSettings['token'];
@@ -215,16 +229,7 @@ class BaseForm extends Validator{
 		if(isset($aSettings['whitelist'])){
 			$this->add_whitelisted_fields($aSettings['whitelist']);
 		}
-		if(
-			isset($aSettings['inner_html_callback'])
-			&&
-			is_callable($aSettings['inner_html_callback'])
-		){
-			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
-		}
-		if(isset($aSettings['encoding'])){
-			$this->_sEncoding = $aSettings['encoding'];
-		}
+
 		$this->fetch_form_data();
 	}
 
