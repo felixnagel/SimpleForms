@@ -105,8 +105,23 @@ abstract class BaseValidator{
 	 * @return	array 	array with field validations (boolean values of field keys)
 	 */
 	public function validate(){
-		$this->_validate_once();
+		$this->_aVldtn = [];
+		$this->_aErrors = [];
+		
+		foreach($this->_aVldtrs as $sFieldId => $aVldtrDef){
+			$mInputValue = $this->ads_get($this->_aData, $sFieldId);
+			$this->_validate_single_field($sFieldId, $mInputValue, $aVldtrDef);
+		}
+		
 		return $this->_aVldtn;
+	}
+
+	/**
+	 * Check if form is valid.
+	 * @return boolean 	form is valid
+	 */
+	public function is_valid(){
+		return !(bool)$this->_aErrors;
 	}
 
 	/**
@@ -303,11 +318,6 @@ abstract class BaseValidator{
 	 * Validates all given data in case it has not been validated yet.
 	 */
 	private function _validate_once(){
-		foreach($this->_aVldtrs as $sFieldId => $aVldtrDef){
-			$mInputValue = $this->ads_get($this->_aData, $sFieldId);
-			$this->_validate_single_field($sFieldId, $mInputValue, $aVldtrDef);
-			unset($this->_aVldtrs[$sFieldId]);
-		}
 	}
 
 	/**

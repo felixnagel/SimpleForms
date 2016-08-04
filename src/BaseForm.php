@@ -13,7 +13,19 @@ class BaseForm extends Validator{
 	 * Form data array
 	 * @var	array
 	 */
-	private $_aFormData;
+	private $_aFormData = [];
+
+	/**
+	 * Raw Form data array
+	 * @var array
+	 */
+	private $_aRawFormData = [];
+
+	/**
+	 * Default form data.
+	 * @var array
+	 */
+	private $_aDefaultData = [];
 
 	/**
 	 * Array of allowed field names. If any are specified, only those will be left. If left empty,
@@ -21,14 +33,6 @@ class BaseForm extends Validator{
 	 * @var array
 	 */
 	private $_aWhitelistedFields = [];
-
-	/**
-	 * Whitelisted form data array. Array structure: [
-	 * 		'field_1', 'field_2', ..., 'field_N'
-	 * ]
-	 * @var array
-	 */
-	private $_aWhitelistedData = [];
 
 	/**
 	 * Defined filters for this form.
@@ -49,7 +53,7 @@ class BaseForm extends Validator{
 	private $_aFieldFilters = [];
 
 	/**
-	 * Filtered form data array. Will always be whitelisted before filtered.
+	 * Filtered form data array. Will always be whitelisted before filtering.
 	 * @var array
 	 */
 	private $_aFilteredData = [];
@@ -193,26 +197,25 @@ class BaseForm extends Validator{
 	 * 	'inner_html_callback', 'token', 'validators', 'whitelist'
 	 */
 	public function __construct($aSettings = []){
-		if(isset($aSettings['default_values'])){
-			$this->add_default_values($aSettings['default_values']);
-		}
-		if(isset($aSettings['encoding'])){
-			$this->_sEncoding = $aSettings['encoding'];
-		}
-		if(isset($aSettings['enctype'])){
-			$this->set_enctype($aSettings['enctype']);
-		}
-		if(isset($aSettings['form_submit_method'])){
-			$this->set_submit_method($aSettings['form_submit_method']);
-		}
-		if(isset($aSettings['filters'])){
-			$this->add_filters($aSettings['filters']);
-		}
+		// html output settings:
 		if(isset($aSettings['id'])){
 			$this->set_id($aSettings['id']);
 		}else{
 			$this->_sFormId = 'form_'.++self::$_iFormCount;			
 		}
+
+		if(isset($aSettings['encoding'])){
+			$this->_sEncoding = $aSettings['encoding'];
+		}
+
+		if(isset($aSettings['enctype'])){
+			$this->set_enctype($aSettings['enctype']);
+		}
+
+		if(isset($aSettings['form_submit_method'])){
+			$this->set_submit_method($aSettings['form_submit_method']);
+		}
+
 		if(
 			isset($aSettings['inner_html_callback'])
 			&&
@@ -220,25 +223,32 @@ class BaseForm extends Validator{
 		){
 			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
 		}
+
+		// security settings:
+		$this->add_whitelisted_fields([$this->_sCrsfTokenKey, $this->_sIsSubmittedKey]);
 		if(isset($aSettings['token'])){
 			$this->_sCrsfToken = $aSettings['token'];
 		}
-		if(isset($aSettings['validators'])){
-			$this->add_validators($aSettings['validators']);
-		}
+
 		if(isset($aSettings['whitelist'])){
 			$this->add_whitelisted_fields($aSettings['whitelist']);
 		}
 
-		$this->fetch_form_data();
-	}
+		// form processing settings:
+		if(isset($aSettings['default_values'])){
+			$this->add_default_values($aSettings['default_values']);
+		}
 
-	/**
-	 * Get form id.
-	 * @return	string 	form id
-	 */
-	public function get_form_id(){
-		return $this->_sFormId;
+		$this->_aRawFormData = $this->get_raw_form_data();
+		$this->_aFilteredData = $this->_aRawFormData;
+
+		if(isset($aSettings['filters'])){
+			$this->add_filters($aSettings['filters']);
+		}
+
+		if(isset($aSettings['validators'])){
+			$this->add_validators($aSettings['validators']);
+		}
 	}
 
 	/**
@@ -255,11 +265,14 @@ class BaseForm extends Validator{
 	 * @param 	array 	$aData 	array of form data
 	 */
 	public function add_default_values($aData){
-		if(!$this->is_submitted()){
-			$this->_aFormData = $this->_array_merge_recursive_ex($aData, $this->_aFormData);
-		}
+		$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aData);
 	}
 
+	/**
+	 * Gets validated fields' error messages. Those may be modified by a defined innerHtmlCallback.
+	 * @param  boolean 	$bInnerHtmlCallback 	flag for using the defined innerHtmlCallback
+	 * @return array 							all generated
+	 */
 	public function get_error_messages($bInnerHtmlCallback = false){
 		if(!$bInnerHtmlCallback){
 			return $this->_aVldtrErrMsg;
@@ -343,13 +356,20 @@ class BaseForm extends Validator{
 		// class=""
 		// ...add a class attribute, prefilled with error class if this field isnt valid
 		if(in_array('class', $aAttrTags)){
-			if(isset($this->get_errors()[$sFieldId])){
+			// handle error class
+			if(
+				$this->is_submitted()
+				&&
+				!$this->is_valid()
+				&&
+				isset($this->get_errors()[$sFieldId])
+			){
 				if(isset($aAttr['class'])){
 					$aAttr['class'] .= ' '.$this->_sCssErrorClass;
 				}else{
 					$aAttr['class'] = $this->_sCssErrorClass;
 				}
-			}			
+			}
 		}
 		
 		// name="", id="", for=""
@@ -395,7 +415,7 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Create a html datalist tag. >This is a mapping to ->field().
+	 * Create a html datalist tag. This is a mapping to ->field().
 	 * @param  array 	$aSettings 	tag settings
 	 * @return string            	generated html tag string
 	 */
@@ -424,6 +444,7 @@ class BaseForm extends Validator{
 		if(!$this->is_submitted() || $this->is_valid()){
 			return '';
 		}
+
 		// ... or specified field is valid
 		// NOTE: following line will trigger validation process (if form has been submitted)
 		$aErrors = $this->get_errors();
@@ -437,23 +458,16 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Fetch the original form data (before whitelisting and filtering).
-	 * @return 	array 	the fetched form data
+	 * Fetches the raw form data from $_GET/$_POST. Also adds the defined default data. Default
+	 * data fields will always appear, others only on form submission.
+	 * 
+	 * @return 	array 	form raw data array
 	 */
-	public function fetch_form_data(){
-		if($this->_sFormSubmitMethod === 'POST'){
-			if(!isset($_POST[$this->_sFormId])){
-				return [];
-			}
-		}
-		if($this->_sFormSubmitMethod === 'GET'){
-			if(!isset($_GET[$this->_sFormId])){
-				return [];
-			}
-		}
+	public function get_raw_form_data(){
+		$aResult = [];
 
 		// get raw form data, from $_POST/$_GET
-		$aFormData = 
+		$aRawFormData = 
 			$this->_sFormSubmitMethod === 'POST'
 			? $_POST[$this->_sFormId]
 			: $_GET[$this->_sFormId]
@@ -464,19 +478,44 @@ class BaseForm extends Validator{
 			$aFileData = $_FILES[$this->_sFormId];
 			foreach($aFileData as $sFileKey => $aFields){
 				foreach($aFields as $sField => $sValue){
-					$aFormData[$sField][$sFileKey] = $sValue;
+					$aRawFormData[$sField][$sFileKey] = $sValue;
 				}
 			}
 		}
 
 		// only store non-empty array as form data member because it has to stay an array value and
 		// otherwise it would be overriden with null in some cases
-		if($aFormData){
-			$this->_aFormData = $aFormData;
+		if($aRawFormData){
+			$aResult = array_merge($aResult, $aRawFormData);
 		}
 
+		// start whitelisting only if any field has been specified for this
+		if($this->_aWhitelistedFields){
+			$aResult = array_intersect_key($aResult, array_flip($this->_aWhitelistedFields));
+		}
+
+		// now add default values
+		$aResult = $this->_array_merge_recursive_ex($this->_aDefaultData, $aResult);
+
 		// return the stored form data
-		return $this->_aFormData;
+		return $aResult;
+	}
+
+	/**
+	 * Get filtered form data (final product).
+	 * @param  	boolean 	$bForce 	flag to refetch all data
+	 * @return 	array          			stored filtered form data array
+	 */
+	public function get($sKey = null){
+		$mResult = null;
+		if($sKey === null){
+			$mResult = $this->_aFilteredData;
+		}else{
+			if(isset($this->_aFilteredData[$sKey])){
+				$mResult = $this->_aFilteredData[$sKey];
+			}
+		}
+		return $mResult;
 	}
 
 	/**
@@ -556,7 +595,7 @@ class BaseForm extends Validator{
 		// ...html tags that contain their values as inner html (textarea)
 		if($sType === 'textarea'){
 			// put its value as inner html if none is defined
-			if($sValue = $this->_get_field_input($sFieldId)){
+			if($sValue = $this->_get_field_input($sFieldId)){//todo
 				$sInnerHtml = $sValue;
 			}
 		}	
@@ -584,32 +623,38 @@ class BaseForm extends Validator{
 
 	/**
 	 * Execute defined field filters, store and return the resulting form data. These filters will
-	 * manipulate field values after whitelisting and before validating. Changes will be applied on
-	 * the fly, meaning that, if you define multiple filters for the same field, each filter will
-	 * use the returned value of the previous filter.
+	 * manipulate field values stored in filtered data array. Changes will be applied on the fly,
+	 * meaning that, if you define multiple filters for the same field, each filter will use the
+	 * returned value of the previous filter.
 	 * Example: make a field value lowercase and the first character uppercase:
 	 * 	['field_N' => ['strtolower', 'ucfirst']]
-	 * @return 	array 	generated filtered form data
 	 */
 	public function filter(){
-		// before filtering, always execute whitelisting and use the resulting data
-		if(!$this->_aFilteredData){
-			$this->_aFilteredData = $this->whitelist();
-		}
+		$this->_aFilteredData = $this->_aRawFormData;
 
 		// execute each single filter and remove it, meaning that you can only filter the data once
-		while($this->_aFieldFilters){
-			$aFldprcssr = array_shift($this->_aFieldFilters);
+		foreach($this->_aFieldFilters as $aFldprcssr){
+			// dont filter fields that dont exist...
+			// this may happen if form isnt submitted but filters are set
+			if(!isset($this->_aFilteredData[$aFldprcssr['field']])){
+				continue;
+			}
+			// actual execution
 			$this->_execute_filter(
 				$aFldprcssr['field'],
 				$aFldprcssr['callable'],
 				$aFldprcssr['params']
 			);
 		}
-
-		// return the filtered data (is also stored as member)
-		return $this->_aFilteredData;
 	}
+
+	public function get_filtered_form_data(){
+		return array_diff_key(
+			$this->_aFilteredData,
+			array_flip([$this->_sCrsfTokenKey, $this->_sIsSubmittedKey])
+		);
+	}
+
 
 	/**
 	 * Get form enctype.
@@ -644,31 +689,11 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Get whitelisted fields
-	 * @return  array 	currently whitelisted fields
-	 */
-	public function get_whitelisted_fields(){
-		return $this->_aWhitelistedFields;
-	}
-
-	/**
 	 * Check if form has been submitted.
 	 * @return boolean 	form is submitted
 	 */
 	public function is_submitted(){
-		return $this->_check_token() && $this->_aFormData[$this->_sIsSubmittedKey];
-	}
-
-	/**
-	 * Check if form is valid.
-	 * @return boolean 	form is valid
-	 */
-	public function is_valid(){
-		if($this->is_submitted()){
-			$this->validate();
-			return !(bool)$this->get_errors();
-		}
-		return false;
+		return $this->_check_token() && $this->_aRawFormData[$this->_sIsSubmittedKey];
 	}
 
 	/**
@@ -679,24 +704,6 @@ class BaseForm extends Validator{
 	 */
 	public function label($sFieldId, $aSettings){
 		return $this->field($sFieldId, 'label', $aSettings);
-	}
-
-	/**
-	 * Overrides existing form data.
-	 * @param 	array 	$aData 	array of form data
-	 */
-	public function overwrite_input($aData){
-		$this->_aFormData = $this->_array_merge_recursive_ex($this->_aFormData, $aData);
-	}
-
-	/**
-	 * Clears data of a form field.
-	 * @param  [type] $sFieldId [description]
-	 */
-	public function clear_field_input($sFieldId){
-		if(isset($this->_aFormData[$sFieldId])){
-			unset($this->_aFormData[$sFieldId]);
-		}
 	}
 
 	/**
@@ -755,35 +762,8 @@ class BaseForm extends Validator{
 	 * @return	array 	array with field validations (boolean values of field keys)
 	 */
 	public function validate(){
-		$this->set_data($this->filter());
+		$this->set_data($this->_aFilteredData);
 		return parent::validate();
-	}
-
-	/**
-	 * Filter whitelisted fields, store and return resulting form data.
-	 * @return array 	whitelisted form data
-	 */
-	public function whitelist(){
-		// only do this once
-		if(!$this->_aWhitelistedData){
-
-			// get initial submitted form data
-			$this->_aWhitelistedData = $this->fetch_form_data();
-			
-			// start whitelisting only if any field has been specified for this
-			if($this->_aWhitelistedFields){
-				// always add csrf token and is submitted token
-				$this->_aWhitelistedFields[] = $this->_sCrsfTokenKey;
-				$this->_aWhitelistedFields[] = $this->_sIsSubmittedKey;
-				
-				// actual whitelisting by intersection
-				$this->_aWhitelistedData = array_intersect_key(
-					$this->_aWhitelistedData,
-					array_flip($this->_aWhitelistedFields)
-				);
-			}
-		}
-		return $this->_aWhitelistedData;
 	}
 
 	/**
@@ -818,7 +798,7 @@ class BaseForm extends Validator{
 		if(
 			$this->_sCrsfToken === false
 			||
-			$this->_aFormData[$this->_sCrsfTokenKey] === $this->_sCrsfToken
+			$this->_aRawFormData[$this->_sCrsfTokenKey] === $this->_sCrsfToken
 		){
 			return true;
 		}
@@ -921,13 +901,22 @@ class BaseForm extends Validator{
 		$mResult = null;
 		
 		// transform given field name into array notation, since each form is treated as an array
-		$sInputKey = preg_replace('/\[[^]]*\]/', '', $sName);
+		$sInputKey = $this->_create_input_key($sName);
 		
 		//	get the field value if existing
-		if(isset($this->_aFormData[$sInputKey])){
-			$mResult = $this->_aFormData[$sInputKey];
+		if(isset($this->_aRawFormData[$sInputKey])){
+			$mResult = $this->_aRawFormData[$sInputKey];
 		}
 		return $mResult;
+	}
+
+	/**
+	 * Creates the actual field from the field name (fields are internally mapped into an array).
+	 * @param  	string 	$sName 	name of field
+	 * @return 	string 	       	created input array key
+	 */
+	private function _create_input_key($sName){
+		return preg_replace('/\[[^]]*\]/', '', $sName);
 	}
 
 	/**
