@@ -239,9 +239,6 @@ class BaseForm extends Validator{
 			$this->add_default_values($aSettings['default_values']);
 		}
 
-		$this->_aRawFormData = $this->get_raw_form_data();
-		$this->_aFilteredData = $this->_aRawFormData;
-
 		if(isset($aSettings['filters'])){
 			$this->add_filters($aSettings['filters']);
 		}
@@ -249,6 +246,11 @@ class BaseForm extends Validator{
 		if(isset($aSettings['validators'])){
 			$this->add_validators($aSettings['validators']);
 		}
+	}
+
+	public function fetch_data(){
+		$this->_aRawFormData = $this->get_raw_form_data();
+		$this->_aFilteredData = $this->_aRawFormData;
 	}
 
 	/**
