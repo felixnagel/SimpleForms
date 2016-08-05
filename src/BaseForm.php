@@ -123,7 +123,7 @@ class BaseForm extends Validator{
 	 * This callback must return the manipulated inner html as string.
 	 * @var callable
 	 */
-	protected $_innerHtmlCallback;
+	protected $_fInnerHtmlCallback;
 
 	/**
 	 * Html templates for different tags.
@@ -221,7 +221,7 @@ class BaseForm extends Validator{
 			&&
 			is_callable($aSettings['inner_html_callback'])
 		){
-			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
+			$this->_fInnerHtmlCallback = $aSettings['inner_html_callback'];
 		}
 
 		// security settings:
@@ -280,7 +280,7 @@ class BaseForm extends Validator{
 		$aResult = [];
 		foreach($this->_aVldtrErrMsg as $sKey => $sMessage){
 			$aResult[$sKey] = call_user_func_array(
-				$this->_innerHtmlCallback, [$this->_sFormId, 'error', $sMessage]
+				$this->_fInnerHtmlCallback, [$this->_sFormId, 'error', $sMessage]
 			);
 		}
 		return $aResult;
@@ -376,7 +376,9 @@ class BaseForm extends Validator{
 		// ...add name, id and for attributes, all prefilled with field id
 		foreach(array_intersect(['name', 'id', 'for', 'data-error_for'], $aAttrTags) as $sAttr){
 			if(!isset($aAttr[$sAttr])){
-				$aAttr[$sAttr] = $this->_create_field_name($sFieldId);
+				// create regular array notation string from array dot syntax and prepend form
+				// namespace
+				$aAttr[$sAttr] = $this->_sFormId . '[' . str_replace('.', '][', $sFieldId) . ']';
 			}			
 		}
 
@@ -390,7 +392,7 @@ class BaseForm extends Validator{
 		// ...add value attribute prefilled with field value
 		if(in_array('value', $aAttrTags)){
 			if(!isset($aAttr['value'])){
-				$aAttr['value'] = $this->_get_field_input($sFieldId);
+				$aAttr['value'] = $this->ads_get($this->_aRawFormData, $sFieldId);
 			}
 		}
 
@@ -401,9 +403,9 @@ class BaseForm extends Validator{
 			if(!isset($aAttr[$sAttr])){
 				// check for specific value or in_array because field may be array field (multiple)
 				if(
-					$aAttr['value'] == $this->_get_field_input($sFieldId)
+					$aAttr['value'] == $this->ads_get($this->_aRawFormData, $sFieldId)
 					||
-					in_array($aAttr['value'], $this->_get_field_input($sFieldId))
+					in_array($aAttr['value'], $this->ads_get($this->_aRawFormData, $sFieldId))
 				){
 					$aAttr[$sAttr] = $sAttr;
 				}
@@ -421,6 +423,10 @@ class BaseForm extends Validator{
 	 */
 	public function datalist($aSettings){
 		return $this->field(null, 'datalist', $aSettings);
+	}
+
+	private function ads_to_classic($sAdsString){
+
 	}
 
 	/**
@@ -572,22 +578,13 @@ class BaseForm extends Validator{
 		}
 
 		// execute inner html callback for specific tags, if available
-		// @todo 	#REMOVE?
-		// $sInnerHtml !== false
 		if(
-			$sInnerHtml !== false
+			is_callable($this->_fInnerHtmlCallback)
 			&&
-			is_callable($this->_innerHtmlCallback)
-			&&
-			in_array($sType, [
-				'error',
-				'label',
-				'option',
-				'textarea',
-			])
+			in_array($sType, ['error', 'label', 'option', 'textarea'])
 		){
 			$sInnerHtml = call_user_func_array(
-				$this->_innerHtmlCallback,
+				$this->_fInnerHtmlCallback,
 				[$this->_sFormId, $sType, $sInnerHtml]
 			);
 		}	
@@ -595,7 +592,7 @@ class BaseForm extends Validator{
 		// ...html tags that contain their values as inner html (textarea)
 		if($sType === 'textarea'){
 			// put its value as inner html if none is defined
-			if($sValue = $this->_get_field_input($sFieldId)){//todo
+			if($sValue = $this->ads_get($this->_aRawFormData, $sFieldId)){
 				$sInnerHtml = $sValue;
 			}
 		}	
@@ -631,15 +628,8 @@ class BaseForm extends Validator{
 	 */
 	public function filter(){
 		$this->_aFilteredData = $this->_aRawFormData;
-
 		// execute each single filter and remove it, meaning that you can only filter the data once
 		foreach($this->_aFieldFilters as $aFldprcssr){
-			// dont filter fields that dont exist...
-			// this may happen if form isnt submitted but filters are set
-			if(!isset($this->_aFilteredData[$aFldprcssr['field']])){
-				continue;
-			}
-			// actual execution
 			$this->_execute_filter(
 				$aFldprcssr['field'],
 				$aFldprcssr['callable'],
@@ -648,13 +638,17 @@ class BaseForm extends Validator{
 		}
 	}
 
+	/**
+	 * Gets the filtered form data. Also removes csrf token value and is submitted value before
+	 * returning.
+	 * @return	array 	filtered form data array
+	 */
 	public function get_filtered_form_data(){
 		return array_diff_key(
 			$this->_aFilteredData,
 			array_flip([$this->_sCrsfTokenKey, $this->_sIsSubmittedKey])
 		);
 	}
-
 
 	/**
 	 * Get form enctype.
@@ -823,24 +817,6 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Creates the name for a form field. Those are always put inside brackets after the form id,
-	 * just like a form array value. Technically it actually is, but it is autoimatically packed
-	 * and unpacked by this class.
-	 * @param 	string 	$sName 	name of form field
-	 * @return 	string        	created form field name
-	 */
-	private function _create_field_name($sName){
-		// if given name already is an array, put it into 2nd dimension		
-		if(preg_match('=(.+?)(\[.+)=', $sName, $aMatches)){
-			$sResult = $this->_sFormId . '[' . $aMatches[1] . ']' . $aMatches[2];
-		}else{
-			// otherwise just as form array
-			$sResult = $this->_sFormId . '[' . $sName . ']';
-		}
-		return $sResult;
-	}
-
-	/**
 	 * Escapes html string.
 	 * @param	string	$sS		string
 	 * @return	string			escaped string.
@@ -860,7 +836,7 @@ class BaseForm extends Validator{
 		// check each param for field value references and replace them by its referenced value
 		foreach($aParams as $iKey => $mValue){
 			if($sFieldKey = $this->_get_masked_field_reference($mValue)){
-				$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey, null);
+				$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey);
 			}
 		}
 		
@@ -881,42 +857,14 @@ class BaseForm extends Validator{
 			}
 		}
 
-		// actually call the filter function and drictly put its result into the filtered form data
-		// member array
+		// finally call the filter function and directly put its result into the filtered form
+		// data member array
 		try{
 			$mResult = call_user_func_array($sCallable, $aParams);
 			$this->ads_set($this->_aFilteredData, $sFieldId, $mResult);
 		}catch(\Exception $e){
 			return;
 		}
-	}
-
-	/**
-	 * Gets the input from a single form field.
-	 * @param 	string 	$sName 	name of form field
-	 * @return 	mixed        	value of respective form field
-	 */
-	private function _get_field_input($sName){		
-		// default result is null in
-		$mResult = null;
-		
-		// transform given field name into array notation, since each form is treated as an array
-		$sInputKey = $this->_create_input_key($sName);
-		
-		//	get the field value if existing
-		if(isset($this->_aRawFormData[$sInputKey])){
-			$mResult = $this->_aRawFormData[$sInputKey];
-		}
-		return $mResult;
-	}
-
-	/**
-	 * Creates the actual field from the field name (fields are internally mapped into an array).
-	 * @param  	string 	$sName 	name of field
-	 * @return 	string 	       	created input array key
-	 */
-	private function _create_input_key($sName){
-		return preg_replace('/\[[^]]*\]/', '', $sName);
 	}
 
 	/**
