@@ -104,13 +104,13 @@ class BaseForm extends Validator{
 	 * Key of hidden csrf token field.
 	 * @var string
 	 */
-	private $_sCrsfTokenKey = '::csrf_token';
+	private $_sCsrfTokenKey = '::csrf_token';
 
 	/**
 	 * Value of csrf token. If false, it will be ignored.
 	 * @var mixed
 	 */
-	private $_sCrsfToken = false;
+	private $_sCsrfToken = false;
 
 	/**
 	 * Key of hidden submitted field.
@@ -225,9 +225,9 @@ class BaseForm extends Validator{
 		}
 
 		// security settings:
-		$this->add_whitelisted_fields([$this->_sCrsfTokenKey, $this->_sIsSubmittedKey]);
+		$this->add_whitelisted_fields([$this->_sCsrfTokenKey, $this->_sIsSubmittedKey]);
 		if(isset($aSettings['token'])){
-			$this->_sCrsfToken = $aSettings['token'];
+			$this->_sCsrfToken = $aSettings['token'];
 		}
 
 		if(isset($aSettings['whitelist'])){
@@ -434,7 +434,7 @@ class BaseForm extends Validator{
 	 */
 	public function enable(){
 		return
-			$this->field($this->_sCrsfTokenKey, 'hidden', ['value' => $this->_sCrsfToken])
+			$this->field($this->_sCsrfTokenKey, 'hidden', ['value' => $this->_sCsrfToken])
 			.$this->field($this->_sIsSubmittedKey, 'hidden', ['value' => true]);
 	}
 
@@ -646,7 +646,7 @@ class BaseForm extends Validator{
 	public function get_filtered_form_data(){
 		return array_diff_key(
 			$this->_aFilteredData,
-			array_flip([$this->_sCrsfTokenKey, $this->_sIsSubmittedKey])
+			array_flip([$this->_sCsrfTokenKey, $this->_sIsSubmittedKey])
 		);
 	}
 
@@ -705,7 +705,7 @@ class BaseForm extends Validator{
 	 * @param 	mixed 	$mToken 	token value
 	 */
 	public function set_csrf_token($mToken){
-		$this->_sCrsfToken = $mToken;
+		$this->_sCsrfToken = $mToken;
 	}
 
 	/**
@@ -784,15 +784,15 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Check crsf token. Returns true, if token is disabled (value === false) or if token value is
+	 * Check csrf token. Returns true, if token is disabled (value === false) or if token value is
 	 * matching submitted token field value.
 	 * @return	boolean 	csrf token matching
 	 */
 	private function _check_token(){
 		if(
-			$this->_sCrsfToken === false
+			$this->_sCsrfToken === false
 			||
-			$this->_aRawFormData[$this->_sCrsfTokenKey] === $this->_sCrsfToken
+			$this->_aRawFormData[$this->_sCsrfTokenKey] === $this->_sCsrfToken
 		){
 			return true;
 		}
