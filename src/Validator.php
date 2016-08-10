@@ -5,6 +5,7 @@ namespace LuckyNail\SimpleForms;
 class Validator extends BaseValidator{
 	protected $_aVldtrErrMsg = [
 		'array'       => 'VALIDATOR_ARRAY',
+		'count'       => 'VALIDATOR_COUNT',
 		'date'        => 'VALIDATOR_DATE',
 		'date_after'  => 'VALIDATOR_DATE_AFTER',
 		'date_before' => 'VALIDATOR_DATE_BEFORE',
@@ -75,6 +76,9 @@ class Validator extends BaseValidator{
 		return $sValue === $sCompareVal;
 	}	
 	protected function __validator__fl_range($sValue, $sInterval){
+		if(is_array($sValue)){
+			$sValue = count($sValue);
+		}
 		if(!is_numeric($sValue)){
 			return false;
 		}

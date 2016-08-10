@@ -167,6 +167,7 @@ class BaseForm extends Validator{
 		'file'           => ['class', 'id', 'name', 'type',],
 		'hidden'         => ['class', 'id', 'name', 'type', 'value',],
 		'label'          => ['class', 'for',],
+		'label_wrapped'  => ['class',],
 		'month'          => ['class', 'id', 'name', 'type', 'value',],
 		'number'         => ['class', 'id', 'name', 'type', 'value',],
 		'optgroup'       => ['label',],
@@ -184,7 +185,7 @@ class BaseForm extends Validator{
 		'week'           => ['class', 'id', 'name', 'type', 'value',],
 	];
 
-	private $_sEncoding = 'utf-8';
+	private $_sEncoding = false;
 
 	/**
 	 * An optional settings array may be passed to skip additional
@@ -193,8 +194,8 @@ class BaseForm extends Validator{
 	 * 
 	 * @param array 	$aSettings 	Associative array with all property values to be passed to
 	 * their respective setter methods. Possible keys:
-	 * 	'default_values', 'encoding', 'enctype', 'form_submit_method', 'filters', 'id',
-	 * 	'inner_html_callback', 'token', 'validators', 'whitelist'
+	 * 	'default_values', 'encoding', 'enctype', 'error_messages', 'form_submit_method',
+	 * 	'filters', 'id', 'inner_html_callback', 'token', 'validators', 'whitelist'
 	 */
 	public function __construct($aSettings = []){
 		// html output settings:
@@ -210,6 +211,10 @@ class BaseForm extends Validator{
 
 		if(isset($aSettings['enctype'])){
 			$this->set_enctype($aSettings['enctype']);
+		}
+
+		if(isset($aSettings['error_messages'])){
+			$this->add_error_messages($aSettings['error_messages']);
 		}
 
 		if(isset($aSettings['form_submit_method'])){
@@ -343,7 +348,9 @@ class BaseForm extends Validator{
 	 * @param  array 	$aAttr 		predefined attributes
 	 * @return string 				created attribute string
 	 */
-	public function attr($sFieldId, $sType, $aAttr = []){
+	public function attr($sFieldName, $sType, $aAttr = []){
+		$sFieldId = $this->_name_to_field_id($sFieldName);
+
 		// if defined, merge given attributes with set up default attributes
 		if(isset($this->_aDefaultAttr[$sFieldId])){
 			$aAttr = $this->_array_merge_recursive_ex($this->_aDefaultAttr[$sFieldId], $aAttr);
@@ -380,7 +387,7 @@ class BaseForm extends Validator{
 			if(!isset($aAttr[$sAttr])){
 				// create regular array notation string from array dot syntax and prepend form
 				// namespace
-				$aAttr[$sAttr] = $this->_sFormId . '[' . str_replace('.', '][', $sFieldId) . ']';
+				$aAttr[$sAttr] = $this->_normalize_field_name($sFieldName);
 			}			
 		}
 
@@ -531,12 +538,12 @@ class BaseForm extends Validator{
 	 * configured form input types (defined in ->_aAttrTags). The optional parameter $aSettings is
 	 * used to specify certain tag-specific options and to set up attributes. Specified attribute
 	 * values will always override the automatically generated ones.
-	 * @param  string 	$sFieldId 	form field id
-	 * @param  string 	$sType     	type of the form field ()
-	 * @param  array 	$aSettings 	tag settings
-	 * @return string            	generated html tag string
+	 * @param  string 	$sFieldName 	form field name
+	 * @param  string 	$sType     		type of the form field ()
+	 * @param  array 	$aSettings 		tag settings
+	 * @return string            		generated html tag string
 	 */
-	public function field($sFieldId, $sType, $aSettings = []){
+	public function field($sFieldName, $sType, $aSettings = []){
 		// extract optionally defined html content
 		$sInnerHtml = isset($aSettings['html']) ? $aSettings['html'] : false;
 		unset($aSettings['html']);
@@ -556,7 +563,7 @@ class BaseForm extends Validator{
 		}
 
 		// generate attributes and put them into html tag
-		$sHtml = sprintf($sHtml, $this->attr($sFieldId, $sType, $aAttr), '%s');
+		$sHtml = sprintf($sHtml, $this->attr($sFieldName, $sType, $aAttr), '%s');
 
 		// handle special html tags...
 
@@ -567,14 +574,14 @@ class BaseForm extends Validator{
 				if(is_array($sValue)){
 					// setup settings, then call ->field() to generate optgroup html tag
 					$aSettings = ['label' => $sCaption, 'options' => $sValue];
-					$sInnerHtml .= $this->field($sFieldId, 'optgroup', $aSettings);
+					$sInnerHtml .= $this->field($sFieldName, 'optgroup', $aSettings);
 				}else{
 					if(is_int($sCaption)){
 						$sCaption = $sValue;
 					}
 					// setup settings, then call ->field() to generate option html tag
 					$aSettings = ['html' => $sCaption, 'value' => $sValue];
-					$sInnerHtml .= $this->field($sFieldId, 'option', $aSettings);
+					$sInnerHtml .= $this->field($sFieldName, 'option', $aSettings);
 				}
 			}
 		}
@@ -583,7 +590,7 @@ class BaseForm extends Validator{
 		if(
 			is_callable($this->_fInnerHtmlCallback)
 			&&
-			in_array($sType, ['error', 'label', 'option', 'textarea'])
+			in_array($sType, ['error', 'label', 'optgroup', 'option', 'textarea'])
 		){
 			$sInnerHtml = call_user_func_array(
 				$this->_fInnerHtmlCallback,
@@ -594,6 +601,7 @@ class BaseForm extends Validator{
 		// ...html tags that contain their values as inner html (textarea)
 		if($sType === 'textarea'){
 			// put its value as inner html if none is defined
+			$sFieldId = $this->_name_to_field_id($sFieldName);
 			if($sValue = $this->ads_get($this->_aRawFormData, $sFieldId)){
 				$sInnerHtml = $sValue;
 			}
@@ -823,8 +831,11 @@ class BaseForm extends Validator{
 	 * @param	string	$sS		string
 	 * @return	string			escaped string.
 	 */
-	private function _escape($sS) {
-		return htmlspecialchars($sS, ENT_QUOTES, $this->_sEncoding);
+	private function _escape($sS){
+		if($this->_sEncoding !== false){
+			$sS = mb_convert_encoding($sS, $this->_sEncoding);
+		}
+		return htmlspecialchars($sS, ENT_QUOTES);
 	}
 
 	/**
@@ -837,8 +848,10 @@ class BaseForm extends Validator{
 	private function _execute_filter($sFieldId, $sCallable, $aParams){
 		// check each param for field value references and replace them by its referenced value
 		foreach($aParams as $iKey => $mValue){
-			if($sFieldKey = $this->_get_masked_field_reference($mValue)){
-				$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey);
+			if($aFieldKeys = $this->_get_masked_field_reference($mValue)){
+				foreach($aFieldKeys as $sFieldKey){
+					$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey);
+				}
 			}
 		}
 		
@@ -881,5 +894,19 @@ class BaseForm extends Validator{
 			return preg_replace($sPattern, '$1', $sFilter);
 		}
 		return false;
+	}
+
+
+	private function _read_field_id($sFieldName){
+		$sResult = str_replace('[', '.', $sFieldName);
+		$sResult = str_replace(']', '', $sResult);
+		return $sResult;
+	}
+	private function _name_to_field_id($sName){
+		return rtrim($this->_read_field_id($sName), '.');
+	}
+	private function _normalize_field_name($sInput){
+		$sResult = $this->_read_field_id($sInput);
+		return $this->_sFormId . '[' . str_replace('.', '][', $sResult) . ']';
 	}
 }

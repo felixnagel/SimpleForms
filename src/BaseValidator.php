@@ -327,9 +327,9 @@ abstract class BaseValidator{
 	 * @return mixed				unmasked form field reference id or false
 	 */
 	protected function _get_masked_field_reference($sFieldId){
-		$sPattern = '=^~\{(.+?)\}~$=';
-		if(is_string($sFieldId) && preg_match($sPattern, $sFieldId)){
-			return preg_replace($sPattern, '$1', $sFieldId);
+		$sPattern = '=~\{(.+?)\}~=';
+		if(is_string($sFieldId) && preg_match_all($sPattern, $sFieldId, $aMatches)){
+			return $aMatches[1];
 		}
 		return false;
 	}
