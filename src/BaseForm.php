@@ -130,14 +130,15 @@ class BaseForm extends Validator{
 	 * @var array
 	 */
 	protected $_aFieldProtos = [
-		'datalist' => '<datalist %s>%s</datalist>',
-		'default'  => '<input %s/>',
-		'error'    => '<span %s>%s</span>',
-		'label'    => '<label %s>%s</label>',
-		'optgroup' => '<optgroup %s>%s</optgroup>',
-		'option'   => '<option %s>%s</option>',
-		'select'   => '<select %s>%s</select>',
-		'textarea' => '<textarea %s>%s</textarea>',
+		'datalist'  => '<datalist %s>%s</datalist>',
+		'default'   => '<input %s/>',
+		'error'     => '<span %s>%s</span>',
+		'label'     => '<label %s>%s</label>',
+		'label_for' => '<label %s>%s</label>',
+		'optgroup'  => '<optgroup %s>%s</optgroup>',
+		'option'    => '<option %s>%s</option>',
+		'select'    => '<select %s>%s</select>',
+		'textarea'  => '<textarea %s>%s</textarea>',
 	];
 
 	/**
@@ -166,9 +167,10 @@ class BaseForm extends Validator{
 		'error'          => ['data-error_for',],
 		'file'           => ['class', 'id', 'name', 'type',],
 		'hidden'         => ['class', 'id', 'name', 'type', 'value',],
-		'label'          => ['class', 'for',],
-		'label_wrapped'  => ['class',],
+		'label'          => ['class',],
+		'label_for'      => ['class', 'for',],
 		'month'          => ['class', 'id', 'name', 'type', 'value',],
+		'multiselect'    => ['class', 'id', 'name', 'multiple',],
 		'number'         => ['class', 'id', 'name', 'type', 'value',],
 		'optgroup'       => ['label',],
 		'option'         => ['selected', 'value',],
@@ -254,8 +256,10 @@ class BaseForm extends Validator{
 	}
 
 	public function fetch_data(){
-		$this->_aRawFormData = $this->get_raw_form_data();
-		$this->_aFilteredData = $this->_aRawFormData;
+		$aRawData = $this->get_raw_form_data();
+		$this->_aRawFormData = $aRawData;
+		$this->_aFilteredData = $aRawData;
+		$this->set_data($aRawData);
 	}
 
 	/**
@@ -273,6 +277,16 @@ class BaseForm extends Validator{
 	 */
 	public function add_default_values($aData){
 		$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aData);
+	}
+
+	public function publish_filtered_values($aFieldNames){
+		if(!is_array($aFieldNames)){
+			$aFieldNames = [$aFieldNames];
+		}
+		foreach($aFieldNames as $sFieldName){
+			$this->ads_set($this->_aRawFormData, $sFieldName, $this->_aFilteredData[$sFieldName]);
+		}
+		$this->set_data($this->_aRawFormData);	
 	}
 
 	/**
@@ -434,10 +448,6 @@ class BaseForm extends Validator{
 		return $this->field(null, 'datalist', $aSettings);
 	}
 
-	private function ads_to_classic($sAdsString){
-
-	}
-
 	/**
 	 * Always use this inside html form. This will print hidden csrf-token and is-submitted fields.
 	 */
@@ -551,7 +561,7 @@ class BaseForm extends Validator{
 		// extract optionally defined options (for select, optgroup and datalist tags)
 		$aOptions = isset($aSettings['options']) ? $aSettings['options'] : [];
 		unset($aSettings['options']);
-		
+
 		// rename variable since it now should only contain attributes
 		$aAttr = $aSettings;
 		
@@ -590,7 +600,7 @@ class BaseForm extends Validator{
 		if(
 			is_callable($this->_fInnerHtmlCallback)
 			&&
-			in_array($sType, ['error', 'label', 'optgroup', 'option', 'textarea'])
+			in_array($sType, ['error', 'label', 'label_for', 'optgroup', 'option', 'textarea'])
 		){
 			$sInnerHtml = call_user_func_array(
 				$this->_fInnerHtmlCallback,
@@ -608,7 +618,7 @@ class BaseForm extends Validator{
 		}	
 
 		// ...html tags with inner html that should be escaped (option, textarea)
-		if(in_array($sType, ['label', 'option', 'textarea'])){
+		if(in_array($sType, ['label', 'label_for', 'option', 'textarea'])){
 			$sInnerHtml = $this->_escape($sInnerHtml);
 		}
 
@@ -617,6 +627,7 @@ class BaseForm extends Validator{
 			'datalist',
 			'error',
 			'label',
+			'label_for',
 			'optgroup',
 			'option',
 			'select',
@@ -646,6 +657,7 @@ class BaseForm extends Validator{
 				$aFldprcssr['params']
 			);
 		}
+		$this->set_data($this->_aFilteredData);
 	}
 
 	/**
@@ -700,14 +712,8 @@ class BaseForm extends Validator{
 		return $this->_check_token() && $this->_aRawFormData[$this->_sIsSubmittedKey];
 	}
 
-	/**
-	 * Create a html label tag. This is a mapping to ->field().
-	 * @param  string 	$sFieldId 	form field id label is related to
-	 * @param  array 	$aSettings 	tag settings
-	 * @return string            	generated html tag string
-	 */
-	public function label($sFieldId, $aSettings){
-		return $this->field($sFieldId, 'label', $aSettings);
+	public function is_valid(){
+		return $this->is_submitted() && parent::is_valid();
 	}
 
 	/**
@@ -759,15 +765,6 @@ class BaseForm extends Validator{
 			throw new Exception('Given string must be of "POST" or "GET".');
 		}
 		$this->_sFormSubmitMethod = $sFormSubmitMethod;
-	}
-
-	/**
-	 * Validate the form.
-	 * @return	array 	array with field validations (boolean values of field keys)
-	 */
-	public function validate(){
-		$this->set_data($this->_aFilteredData);
-		return parent::validate();
 	}
 
 	/**
@@ -847,18 +844,12 @@ class BaseForm extends Validator{
 	 */
 	private function _execute_filter($sFieldId, $sCallable, $aParams){
 		// check each param for field value references and replace them by its referenced value
-		foreach($aParams as $iKey => $mValue){
-			if($aFieldKeys = $this->_get_masked_field_reference($mValue)){
-				foreach($aFieldKeys as $sFieldKey){
-					$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey);
-				}
-			}
-		}
+		$this->_decipher_masked_field_references($aParams, $this->_aFilteredData);
 		
 		// if given callable name is not a default php function
 		if(!is_callable($sCallable)){
 			// check if its a reference to a custom filter function
-			$sFiltername = $this->_get_masked_filter_reference($sCallable);
+			$sFiltername = ltrim($sCallable, '@');
 			if(isset($this->_aCustomFilters[$sFiltername])){
 				$sCallable = $this->_aCustomFilters[$sFiltername];
 			}else{
@@ -881,21 +872,6 @@ class BaseForm extends Validator{
 			return;
 		}
 	}
-
-	/**
-	 * Check if filter callable is a masked filter name and return its unmasked name or otherwise
-	 * return false.
-	 * @param   $sFilter 	filter callable name
-	 * @return 	mixed 		unmasked filter callable name or false
-	 */
-	private function _get_masked_filter_reference($sFilter){
-		$sPattern = '=^@(.+?)$=';
-		if(is_string($sFilter) && preg_match($sPattern, $sFilter)){
-			return preg_replace($sPattern, '$1', $sFilter);
-		}
-		return false;
-	}
-
 
 	private function _read_field_id($sFieldName){
 		$sResult = str_replace('[', '.', $sFieldName);

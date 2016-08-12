@@ -40,6 +40,9 @@ class Validator extends BaseValidator{
 		}
 		return $bResult;
 	}
+	protected function __validator__count($sValue, $iCount){
+		return $iCount === count($sValue);
+	}
 	protected function __validator__date($sValue, $sFormat = 'Y-m-d'){
 		$oDate = DateTime::createFromFormat($sFormat, $sValue);
     	return $oDate && $oDate->format($sFormat) === $sValue;
@@ -74,7 +77,7 @@ class Validator extends BaseValidator{
 	}
 	protected function __validator__eq_strict($sValue, $sCompareVal){
 		return $sValue === $sCompareVal;
-	}	
+	}
 	protected function __validator__fl_range($sValue, $sInterval){
 		if(is_array($sValue)){
 			$sValue = count($sValue);
@@ -163,7 +166,6 @@ class Validator extends BaseValidator{
 		}
 		if(preg_match_all('=^(\d*)\s*\,\s*(\d*)$=', $sInterval, $aMatches)){
 			$iMin = (int)$aMatches[1][0];
-			Core_Debug::dump($sValue);
 			if($iMin){
 				if(strlen($sValue) < $iMin){
 					return false;
