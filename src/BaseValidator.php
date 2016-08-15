@@ -7,11 +7,12 @@ use LuckyNail\Simple\ArrayDotSyntax;
 abstract class BaseValidator{
 	use ArrayDotSyntax;
 
+
 	/**
-	 * Array holding validation boolean results
-	 * @var	array
+	 * Flag stating, if data has been validated yet
+	 * @var boolean
 	 */
-	private $_aVldtn = [];
+	private $_bIsValidated = false;
 	
 	/**
 	 * Flag stating, if validator stops after the first error
@@ -49,6 +50,9 @@ abstract class BaseValidator{
 	 */
 	private $_aData = [];
 
+	private $_sMaskParamPattern = '=^~\{(.+?)\}~$=';
+	private $_sMastParamProto = '~{%s}~';
+
 	/**
 	 * Sets quick flag.
 	 * @param	bool 	$bQuick		flag boolean value
@@ -56,6 +60,7 @@ abstract class BaseValidator{
 	public function set_quick($bQuick){
 		$this->_bQuick = $bQuick;
 	}
+
 
 	/**
 	 * Adds validators. Each field may be added multiple validators. Respective fields are
@@ -86,28 +91,42 @@ abstract class BaseValidator{
 	 * @return	array 	invalid form field errors
 	 */
 	public function get_errors(){
-		$this->_validate_once();
 		return $this->_aErrors;
 	}
 
 	/**
-	 * Adds custom error messages.
-	 * @param	string 	$sVldtrName  	name of validator this error message will be associated
-	 *                              	with
-	 * @param 	string 	$sVldtrErrMsg 	error message string, may contain %s placeholder for 	
-	 *                                	sprintf(), where validator param values will be inserted
+	 * Adds custom error messages. Example array structure: [
+	 * 		'required' => 'Fill this field, please.',
+	 * 		'drinks.!eq' => 'Dont drink beer, it\'s unhealthy!',
+	 * 	]
+	 * @param	array 	$aErrorMessages		array of error messages
 	 */
-	public function add_error_messages($sVldtrName, $sVldtrErrMsg){
-		$this->_aVldtrErrMsg = array_merge($this->_aVldtrErrMsg, [$sVldtrName => $sVldtrErrMsg]);
+	public function add_error_messages($aErrorMessages){
+		$this->_aVldtrErrMsg = array_merge($this->_aVldtrErrMsg, $aErrorMessages);
 	}
 
 	/**
 	 * Validates given data.
 	 * @return	array 	array with field validations (boolean values of field keys)
 	 */
-	public function validate(){
-		$this->_validate_once();
-		return $this->_aVldtn;
+	private function _validate(){
+		$this->_aErrors = [];
+		foreach($this->_aVldtrs as $sFieldId => $aVldtrDef){
+			$mInputValue = $this->ads_get($this->_aData, $sFieldId);
+			$this->_validate_single_field($sFieldId, $mInputValue, $aVldtrDef);
+		}
+		$this->_bIsValidated = true;
+	}
+
+	/**
+	 * Check if form is valid.
+	 * @return boolean 	form is valid
+	 */
+	public function is_valid(){
+		if(!$this->_bIsValidated){
+			$this->_validate();
+		}
+		return !(bool)$this->_aErrors;
 	}
 
 	/**
@@ -124,6 +143,7 @@ abstract class BaseValidator{
 	 * @param	array 	$aData 	data to validate
 	 */
 	public function set_data($aData){
+		$this->_bIsValidated = false;
 		$this->_aData = $aData;
 	}
 
@@ -157,6 +177,20 @@ abstract class BaseValidator{
 		return $aVldtrDef;
 	}
 
+
+	protected function _decipher_masked_field_references(&$sParamDefinition, $aSource){
+		if(is_array($sParamDefinition)){
+			foreach($sParamDefinition as &$sParamDefinitionPart){
+				$sParamDefinition = &$sParamDefinitionPart;
+				$this->_decipher_masked_field_references($sParamDefinition, $aSource);
+			}
+		}else{
+			if(preg_match($this->_sMaskParamPattern, $sParamDefinition, $aMatches)){
+				$sParamDefinition = $this->ads_get($aSource, $aMatches[1]);
+			}	
+		}
+	}
+
 	/**
 	 * Executes a single validator. 
 	 * @param 	string 	$sVldtrName		name of validator
@@ -167,17 +201,7 @@ abstract class BaseValidator{
 	 */
 	protected function _execute_validator($sVldtrName, $mInputValue, $mVldtrParams, $sFieldId){
 		// check each param for field value references and replace them by its referenced value
-		if(is_array($mVldtrParams)){
-			foreach($mVldtrParams as $iKey => $mValue){
-				if($sFieldKey = $this->_get_masked_field_reference($mValue)){
-					$mVldtrParams[$iKey] = $this->ads_get($this->_aData, $sFieldKey, null);
-				}
-			}
-		}else{
-			if($sFieldKey = $this->_get_masked_field_reference($mVldtrParams)){
-				$mVldtrParams = $this->ads_get($this->_aData, $sFieldKey, null);
-			}
-		}
+		$this->_decipher_masked_field_references($mVldtrParams, $this->_aData);
 
 		// check if given validator name refers to a default validator
 		$sExistingVldtr	= '__validator__' . $sVldtrName;
@@ -209,9 +233,6 @@ abstract class BaseValidator{
 		$sMessage = $sFieldId.'.'.$sVldtrName;
 		if(isset($this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName];
-		}
-		elseif(isset($this->_aVldtrErrMsg[$sFieldId])){
-			$sMessage = $this->_aVldtrErrMsg[$sFieldId];
 		}
 		elseif(isset($this->_aVldtrErrMsg[$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sVldtrName];
@@ -266,8 +287,6 @@ abstract class BaseValidator{
 			if(!$bIsValid){
 				$bFieldIsValid = false;
 				foreach($aInvldtdFields as $sInvldtdField){
-					// set negative boolean validation result for this field
-					$this->_aVldtn[$sInvldtdField] = false;
 					$this->_insert_error_message($sInvldtdField, $sVldtrName, $mVldtrParams);
 				}
 				// is quick flag is set, break validation iteration right here
@@ -275,12 +294,6 @@ abstract class BaseValidator{
 					break;
 				}
 			}
-		}
-		
-		// if field value has positively passed all validators
-		if($bFieldIsValid){
-			// set positive validation result for this field
-			$this->_aVldtn[$sFieldId] = true;
 		}
 
 		return $bFieldIsValid;
@@ -304,38 +317,11 @@ abstract class BaseValidator{
 	}
 
 	/**
-	 * Validates all given data in case it has not been validated yet.
-	 */
-	private function _validate_once(){
-		foreach($this->_aVldtrs as $sFieldId => $aVldtrDef){
-			$mInputValue = $this->ads_get($this->_aData, $sFieldId);
-			$this->_validate_single_field($sFieldId, $mInputValue, $aVldtrDef);
-			unset($this->_aVldtrs[$sFieldId]);
-		}
-	}
-
-	/**
-	 * Check if filter param is a masked form field reference and return its unmasked id or
-	 * otherwise return false.
-	 * @param  string 	$sFieldId 	form field id
-	 * @return mixed				unmasked form field reference id or false
-	 */
-	protected function _get_masked_field_reference($sFieldId){
-		$sPattern = '=^~\{(.+?)\}~$=';
-		if(is_string($sFieldId) && preg_match($sPattern, $sFieldId)){
-			return preg_replace($sPattern, '$1', $sFieldId);
-		}
-		return false;
-	}
-
-	/**
 	 * Mask a form field reference id by using delimiters.
 	 * @param  string 	$sFieldId 	form field id
 	 * @return string         		created masked form field reference
 	 */
 	protected function _mask_field_reference($sFieldId){
-		return sprintf('~{%s}~', $sFieldId);
+		return sprintf($this->_sMastParamProto, $sFieldId);
 	}
-
-
 }

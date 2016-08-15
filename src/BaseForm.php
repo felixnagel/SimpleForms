@@ -13,7 +13,19 @@ class BaseForm extends Validator{
 	 * Form data array
 	 * @var	array
 	 */
-	private $_aFormData;
+	private $_aFormData = [];
+
+	/**
+	 * Raw Form data array
+	 * @var array
+	 */
+	private $_aRawFormData = [];
+
+	/**
+	 * Default form data.
+	 * @var array
+	 */
+	private $_aDefaultData = [];
 
 	/**
 	 * Array of allowed field names. If any are specified, only those will be left. If left empty,
@@ -21,14 +33,6 @@ class BaseForm extends Validator{
 	 * @var array
 	 */
 	private $_aWhitelistedFields = [];
-
-	/**
-	 * Whitelisted form data array. Array structure: [
-	 * 		'field_1', 'field_2', ..., 'field_N'
-	 * ]
-	 * @var array
-	 */
-	private $_aWhitelistedData = [];
 
 	/**
 	 * Defined filters for this form.
@@ -49,7 +53,7 @@ class BaseForm extends Validator{
 	private $_aFieldFilters = [];
 
 	/**
-	 * Filtered form data array. Will always be whitelisted before filtered.
+	 * Filtered form data array. Will always be whitelisted before filtering.
 	 * @var array
 	 */
 	private $_aFilteredData = [];
@@ -100,13 +104,13 @@ class BaseForm extends Validator{
 	 * Key of hidden csrf token field.
 	 * @var string
 	 */
-	private $_sCrsfTokenKey = '::csrf_token';
+	private $_sCsrfTokenKey = '::csrf_token';
 
 	/**
 	 * Value of csrf token. If false, it will be ignored.
 	 * @var mixed
 	 */
-	private $_sCrsfToken = false;
+	private $_sCsrfToken = false;
 
 	/**
 	 * Key of hidden submitted field.
@@ -119,20 +123,22 @@ class BaseForm extends Validator{
 	 * This callback must return the manipulated inner html as string.
 	 * @var callable
 	 */
-	protected $_innerHtmlCallback;
+	protected $_fInnerHtmlCallback;
 
 	/**
 	 * Html templates for different tags.
 	 * @var array
 	 */
 	protected $_aFieldProtos = [
-		'datalist' => '<datalist %s>%s</datalist>',
-		'default'  => '<input %s/>',
-		'label'    => '<label %s>%s</label>',
-		'optgroup' => '<optgroup %s>%s</optgroup>',
-		'option'   => '<option %s>%s</option>',
-		'select'   => '<select %s>%s</select>',
-		'textarea' => '<textarea %s>%s</textarea>',
+		'datalist'  => '<datalist %s>%s</datalist>',
+		'default'   => '<input %s/>',
+		'error'     => '<span %s>%s</span>',
+		'label'     => '<label %s>%s</label>',
+		'label_for' => '<label %s>%s</label>',
+		'optgroup'  => '<optgroup %s>%s</optgroup>',
+		'option'    => '<option %s>%s</option>',
+		'select'    => '<select %s>%s</select>',
+		'textarea'  => '<textarea %s>%s</textarea>',
 	];
 
 	/**
@@ -161,8 +167,10 @@ class BaseForm extends Validator{
 		'error'          => ['data-error_for',],
 		'file'           => ['class', 'id', 'name', 'type',],
 		'hidden'         => ['class', 'id', 'name', 'type', 'value',],
-		'label'          => ['class', 'for',],
+		'label'          => ['class',],
+		'label_for'      => ['class', 'for',],
 		'month'          => ['class', 'id', 'name', 'type', 'value',],
+		'multiselect'    => ['class', 'id', 'name', 'multiple',],
 		'number'         => ['class', 'id', 'name', 'type', 'value',],
 		'optgroup'       => ['label',],
 		'option'         => ['selected', 'value',],
@@ -179,6 +187,8 @@ class BaseForm extends Validator{
 		'week'           => ['class', 'id', 'name', 'type', 'value',],
 	];
 
+	private $_sEncoding = false;
+
 	/**
 	 * An optional settings array may be passed to skip additional
 	 * setter method calls. All settings might be done later using the specific
@@ -186,49 +196,70 @@ class BaseForm extends Validator{
 	 * 
 	 * @param array 	$aSettings 	Associative array with all property values to be passed to
 	 * their respective setter methods. Possible keys:
-	 * 	'enctype', 'filters', 'form_submit_method', 'id', 'token', 'validators', 'whitelist'
+	 * 	'default_values', 'encoding', 'enctype', 'error_messages', 'form_submit_method',
+	 * 	'filters', 'id', 'inner_html_callback', 'token', 'validators', 'whitelist'
 	 */
 	public function __construct($aSettings = []){
-		if(isset($aSettings['enctype'])){
-			$this->set_enctype($aSettings['enctype']);
-		}
-		if(isset($aSettings['filters'])){
-			$this->add_filters($aSettings['filters']);
-		}
-		if(isset($aSettings['form_submit_method'])){
-			$this->set_submit_method($aSettings['form_submit_method']);
-		}
+		// html output settings:
 		if(isset($aSettings['id'])){
 			$this->set_id($aSettings['id']);
 		}else{
 			$this->_sFormId = 'form_'.++self::$_iFormCount;			
 		}
-		if(isset($aSettings['token'])){
-			$this->_sCrsfToken = $aSettings['token'];
+
+		if(isset($aSettings['encoding'])){
+			$this->_sEncoding = $aSettings['encoding'];
 		}
-		if(isset($aSettings['validators'])){
-			$this->add_validators($aSettings['validators']);
+
+		if(isset($aSettings['enctype'])){
+			$this->set_enctype($aSettings['enctype']);
 		}
-		if(isset($aSettings['whitelist'])){
-			$this->add_whitelisted_fields($aSettings['whitelist']);
+
+		if(isset($aSettings['error_messages'])){
+			$this->add_error_messages($aSettings['error_messages']);
 		}
+
+		if(isset($aSettings['form_submit_method'])){
+			$this->set_submit_method($aSettings['form_submit_method']);
+		}
+
 		if(
 			isset($aSettings['inner_html_callback'])
 			&&
 			is_callable($aSettings['inner_html_callback'])
 		){
-			$this->_innerHtmlCallback = $aSettings['inner_html_callback'];
+			$this->_fInnerHtmlCallback = $aSettings['inner_html_callback'];
 		}
 
-		$this->fetch_form_data();
+		// security settings:
+		$this->add_whitelisted_fields([$this->_sCsrfTokenKey, $this->_sIsSubmittedKey]);
+		if(isset($aSettings['token'])){
+			$this->_sCsrfToken = $aSettings['token'];
+		}
+
+		if(isset($aSettings['whitelist'])){
+			$this->add_whitelisted_fields($aSettings['whitelist']);
+		}
+
+		// form processing settings:
+		if(isset($aSettings['default_values'])){
+			$this->add_default_values($aSettings['default_values']);
+		}
+
+		if(isset($aSettings['filters'])){
+			$this->add_filters($aSettings['filters']);
+		}
+
+		if(isset($aSettings['validators'])){
+			$this->add_validators($aSettings['validators']);
+		}
 	}
 
-	/**
-	 * Get form id.
-	 * @return	string 	form id
-	 */
-	public function get_form_id(){
-		return $this->_sFormId;
+	public function fetch_data(){
+		$aRawData = $this->get_raw_form_data();
+		$this->_aRawFormData = $aRawData;
+		$this->_aFilteredData = $aRawData;
+		$this->set_data($aRawData);
 	}
 
 	/**
@@ -245,9 +276,35 @@ class BaseForm extends Validator{
 	 * @param 	array 	$aData 	array of form data
 	 */
 	public function add_default_values($aData){
-		if(!$this->is_submitted()){
-			$this->_aFormData = $this->_array_merge_recursive_ex($aData, $this->_aFormData);
+		$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aData);
+	}
+
+	public function publish_filtered_values($aFieldNames){
+		if(!is_array($aFieldNames)){
+			$aFieldNames = [$aFieldNames];
 		}
+		foreach($aFieldNames as $sFieldName){
+			$this->ads_set($this->_aRawFormData, $sFieldName, $this->_aFilteredData[$sFieldName]);
+		}
+		$this->set_data($this->_aRawFormData);	
+	}
+
+	/**
+	 * Gets validated fields' error messages. Those may be modified by a defined innerHtmlCallback.
+	 * @param  boolean 	$bInnerHtmlCallback 	flag for using the defined innerHtmlCallback
+	 * @return array 							all generated
+	 */
+	public function get_error_messages($bInnerHtmlCallback = false){
+		if(!$bInnerHtmlCallback){
+			return $this->_aVldtrErrMsg;
+		}
+		$aResult = [];
+		foreach($this->_aVldtrErrMsg as $sKey => $sMessage){
+			$aResult[$sKey] = call_user_func_array(
+				$this->_fInnerHtmlCallback, [$this->_sFormId, 'error', $sMessage]
+			);
+		}
+		return $aResult;
 	}
 
 	/**
@@ -305,7 +362,9 @@ class BaseForm extends Validator{
 	 * @param  array 	$aAttr 		predefined attributes
 	 * @return string 				created attribute string
 	 */
-	public function attr($sFieldId, $sType, $aAttr = []){
+	public function attr($sFieldName, $sType, $aAttr = []){
+		$sFieldId = $this->_name_to_field_id($sFieldName);
+
 		// if defined, merge given attributes with set up default attributes
 		if(isset($this->_aDefaultAttr[$sFieldId])){
 			$aAttr = $this->_array_merge_recursive_ex($this->_aDefaultAttr[$sFieldId], $aAttr);
@@ -320,20 +379,29 @@ class BaseForm extends Validator{
 		// class=""
 		// ...add a class attribute, prefilled with error class if this field isnt valid
 		if(in_array('class', $aAttrTags)){
-			if(isset($this->get_errors()[$sFieldId])){
+			// handle error class
+			if(
+				$this->is_submitted()
+				&&
+				!$this->is_valid()
+				&&
+				isset($this->get_errors()[$sFieldId])
+			){
 				if(isset($aAttr['class'])){
 					$aAttr['class'] .= ' '.$this->_sCssErrorClass;
 				}else{
 					$aAttr['class'] = $this->_sCssErrorClass;
 				}
-			}			
+			}
 		}
 		
 		// name="", id="", for=""
 		// ...add name, id and for attributes, all prefilled with field id
 		foreach(array_intersect(['name', 'id', 'for', 'data-error_for'], $aAttrTags) as $sAttr){
 			if(!isset($aAttr[$sAttr])){
-				$aAttr[$sAttr] = $this->_create_field_name($sFieldId);
+				// create regular array notation string from array dot syntax and prepend form
+				// namespace
+				$aAttr[$sAttr] = $this->_normalize_field_name($sFieldName);
 			}			
 		}
 
@@ -347,7 +415,7 @@ class BaseForm extends Validator{
 		// ...add value attribute prefilled with field value
 		if(in_array('value', $aAttrTags)){
 			if(!isset($aAttr['value'])){
-				$aAttr['value'] = $this->_get_field_input($sFieldId);
+				$aAttr['value'] = $this->ads_get($this->_aRawFormData, $sFieldId);
 			}
 		}
 
@@ -358,9 +426,9 @@ class BaseForm extends Validator{
 			if(!isset($aAttr[$sAttr])){
 				// check for specific value or in_array because field may be array field (multiple)
 				if(
-					$aAttr['value'] == $this->_get_field_input($sFieldId)
+					$aAttr['value'] == $this->ads_get($this->_aRawFormData, $sFieldId)
 					||
-					in_array($aAttr['value'], $this->_get_field_input($sFieldId))
+					in_array($aAttr['value'], $this->ads_get($this->_aRawFormData, $sFieldId))
 				){
 					$aAttr[$sAttr] = $sAttr;
 				}
@@ -372,7 +440,7 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Create a html datalist tag. >This is a mapping to ->field().
+	 * Create a html datalist tag. This is a mapping to ->field().
 	 * @param  array 	$aSettings 	tag settings
 	 * @return string            	generated html tag string
 	 */
@@ -385,80 +453,97 @@ class BaseForm extends Validator{
 	 */
 	public function enable(){
 		return
-			$this->field($this->_sCrsfTokenKey, 'hidden', ['value' => $this->_sCrsfToken])
+			$this->field($this->_sCsrfTokenKey, 'hidden', ['value' => $this->_sCsrfToken])
 			.$this->field($this->_sIsSubmittedKey, 'hidden', ['value' => true]);
 	}
 
 	/**
-	 * Print html error message. This comes along with a default span-Tag but may be differred by
-	 * specifying the optional parameter $sHtmlProto.
+	 * Print html error message.
 	 * @param	string	$sFieldId	form field id error is related to
-	 * @param	array	$aAttr		associative array of tag attributes
+	 * @param	array	$aSettings	associative array of tag attributes
 	 * @return	string				generated HTML string
 	 */
-	public function error($sFieldId, $aAttr = [], $sHtmlProto = '<span %s>%s</span>'){
+	public function error($sFieldId, $aSettings = []){
 		// no error output when..
 		// ... form is not submitted or valid
 		if(!$this->is_submitted() || $this->is_valid()){
 			return '';
 		}
+
 		// ... or specified field is valid
 		// NOTE: following line will trigger validation process (if form has been submitted)
-		if(!$aErrors = $this->get_errors()[$sFieldId]){
+		$aErrors = $this->get_errors();
+		if(!isset($aErrors[$sFieldId])){
 			return '';
 		}
-		
-		// create error attribute string
-		$sAttr = $this->attr($sFieldId, 'error', $aAttr);
-		
-		// get generated error message
-		$sErrorMsg = $this->_escape(array_shift($aErrors));
-		
-		// return full error html tag as string
-		return sprintf($sHtmlProto, $sAttr, $sErrorMsg);
+
+		// get and return html		
+		$aSettings['html'] = array_shift($aErrors[$sFieldId]);
+		return $this->field($sFieldId, 'error', $aSettings);
 	}
 
 	/**
-	 * Fetch the original form data (before whitelisting and filtering).
-	 * @return 	array 	the fetched form data
+	 * Fetches the raw form data from $_GET/$_POST. Also adds the defined default data. Default
+	 * data fields will always appear, others only on form submission.
+	 * 
+	 * @return 	array 	form raw data array
 	 */
-	public function fetch_form_data(){
-		if($this->_sFormSubmitMethod === 'POST'){
-			if(!isset($_POST[$this->_sFormId])){
-				return [];
-			}
-		}
-		if($this->_sFormSubmitMethod === 'GET'){
-			if(!isset($_GET[$this->_sFormId])){
-				return [];
-			}
-		}
+	public function get_raw_form_data(){
+		$aResult = [];
 
 		// get raw form data, from $_POST/$_GET
-		$aFormData = 
-			$this->_sFormSubmitMethod === 'POST'
-			? $_POST[$this->_sFormId]
-			: $_GET[$this->_sFormId]
-		;
+		$aRawFormData = [];
+		if(isset($_REQUEST[$this->_sFormId])){
+			$aRawFormData = 
+				$this->_sFormSubmitMethod === 'POST'
+				? $_POST[$this->_sFormId]
+				: $_GET[$this->_sFormId]
+			;
+		}
 
 		// get additional data from $_FILES and put them into form data
 		if(isset($_FILES[$this->_sFormId])){
 			$aFileData = $_FILES[$this->_sFormId];
 			foreach($aFileData as $sFileKey => $aFields){
 				foreach($aFields as $sField => $sValue){
-					$aFormData[$sField][$sFileKey] = $sValue;
+					$aRawFormData[$sField][$sFileKey] = $sValue;
 				}
 			}
 		}
 
 		// only store non-empty array as form data member because it has to stay an array value and
 		// otherwise it would be overriden with null in some cases
-		if($aFormData){
-			$this->_aFormData = $aFormData;
+		if($aRawFormData){
+			$aResult = array_merge($aResult, $aRawFormData);
 		}
 
+		// start whitelisting only if any field has been specified for this
+		if($this->_aWhitelistedFields){
+			$aResult = array_intersect_key($aResult, array_flip($this->_aWhitelistedFields));
+		}
+
+		// now add default values
+		$aResult = $this->_array_merge_recursive_ex($this->_aDefaultData, $aResult);
+
 		// return the stored form data
-		return $this->_aFormData;
+		return $aResult;
+	}
+
+	/**
+	 * Get filtered form data (final product).
+	 * @param  	boolean 	$bForce 	flag to refetch all data
+	 * @return 	array          			stored filtered form data array
+	 */
+	public function get($sKey = null){
+		$mResult = null;
+		if($sKey === null){
+			$mResult = $this->_aFilteredData;
+		}else{
+			if(isset($this->_aFilteredData[$sKey])){
+				$mResult = $this->_aFilteredData[$sKey];
+			}
+		}
+		return $mResult;
 	}
 
 	/**
@@ -466,20 +551,26 @@ class BaseForm extends Validator{
 	 * configured form input types (defined in ->_aAttrTags). The optional parameter $aSettings is
 	 * used to specify certain tag-specific options and to set up attributes. Specified attribute
 	 * values will always override the automatically generated ones.
-	 * @param  string 	$sFieldId 	form field id
-	 * @param  string 	$sType     	type of the form field ()
-	 * @param  array 	$aSettings 	tag settings
-	 * @return string            	generated html tag string
+	 * @param  string 	$sFieldName 	form field name
+	 * @param  string 	$sType     		type of the form field ()
+	 * @param  array 	$aSettings 		tag settings
+	 * @return string            		generated html tag string
 	 */
-	public function field($sFieldId, $sType, $aSettings = []){
+	public function field($sFieldName, $sType, $aSettings = []){
 		// extract optionally defined html content
-		$sInnerHtml = isset($aSettings['html']) ? $aSettings['html'] : false;
-		unset($aSettings['html']);
+		$sInnerHtml = false;
+		if(isset($aSettings['html'])){
+			$sInnerHtml = $aSettings['html'];
+			unset($aSettings['html']);
+		}
 		
 		// extract optionally defined options (for select, optgroup and datalist tags)
-		$aOptions = isset($aSettings['options']) ? $aSettings['options'] : [];
-		unset($aSettings['options']);
-		
+		$aOptions = [];
+		if(isset($aSettings['options'])){
+			$aOptions = $aSettings['options'];
+			unset($aSettings['options']);
+		}
+
 		// rename variable since it now should only contain attributes
 		$aAttr = $aSettings;
 		
@@ -489,9 +580,9 @@ class BaseForm extends Validator{
 		}else{
 			$sHtml = $this->_aFieldProtos[$sType];
 		}
-		
+
 		// generate attributes and put them into html tag
-		$sHtml = sprintf($sHtml, $this->attr($sFieldId, $sType, $aAttr), '%s');
+		$sHtml = sprintf($sHtml, $this->attr($sFieldName, $sType, $aAttr), '%s');
 
 		// handle special html tags...
 
@@ -502,79 +593,92 @@ class BaseForm extends Validator{
 				if(is_array($sValue)){
 					// setup settings, then call ->field() to generate optgroup html tag
 					$aSettings = ['label' => $sCaption, 'options' => $sValue];
-					$sInnerHtml .= $this->field($sFieldId, 'optgroup', $aSettings);
+					$sInnerHtml .= $this->field($sFieldName, 'optgroup', $aSettings);
 				}else{
 					if(is_int($sCaption)){
 						$sCaption = $sValue;
 					}
 					// setup settings, then call ->field() to generate option html tag
 					$aSettings = ['html' => $sCaption, 'value' => $sValue];
-					$sInnerHtml .= $this->field($sFieldId, 'option', $aSettings);
+					$sInnerHtml .= $this->field($sFieldName, 'option', $aSettings);
 				}
 			}
 		}
 
 		// execute inner html callback for specific tags, if available
 		if(
-			$sInnerHtml !== false
+			is_callable($this->_fInnerHtmlCallback)
 			&&
-			is_callable($this->_innerHtmlCallback)
-			&&
-			in_array($sType, ['option', 'label', 'textarea'])
+			in_array($sType, ['error', 'label', 'label_for', 'optgroup', 'option', 'textarea'])
 		){
 			$sInnerHtml = call_user_func_array(
-				$this->_innerHtmlCallback,
-				[$this->_sFormId, $sFieldId, $sType, $sInnerHtml]
+				$this->_fInnerHtmlCallback,
+				[$this->_sFormId, $sType, $sInnerHtml]
 			);
 		}	
 
 		// ...html tags that contain their values as inner html (textarea)
 		if($sType === 'textarea'){
 			// put its value as inner html if none is defined
-			if($sValue = $this->_get_field_input($sFieldId)){
+			$sFieldId = $this->_name_to_field_id($sFieldName);
+			if($sValue = $this->ads_get($this->_aRawFormData, $sFieldId)){
 				$sInnerHtml = $sValue;
 			}
 		}	
 
 		// ...html tags with inner html that should be escaped (option, textarea)
-		if(in_array($sType, ['label', 'option', 'textarea'])){
+		if(in_array($sType, ['label', 'label_for', 'option', 'textarea'])){
 			$sInnerHtml = $this->_escape($sInnerHtml);
 		}
 
 		// set inner html and return generated html tag as string
-		if(in_array($sType, ['datalist', 'label', 'optgroup', 'option', 'select', 'textarea'])){
+		if(in_array($sType, [
+			'datalist',
+			'error',
+			'label',
+			'label_for',
+			'optgroup',
+			'option',
+			'select',
+			'textarea',
+		])){
 			$sHtml = sprintf($sHtml, $sInnerHtml);
 		}
+
 		return $sHtml;
 	}
 
 	/**
 	 * Execute defined field filters, store and return the resulting form data. These filters will
-	 * manipulate field values after whitelisting and before validating. Changes will be applied on
-	 * the fly, meaning that, if you define multiple filters for the same field, each filter will
-	 * use the returned value of the previous filter.
+	 * manipulate field values stored in filtered data array. Changes will be applied on the fly,
+	 * meaning that, if you define multiple filters for the same field, each filter will use the
+	 * returned value of the previous filter.
 	 * Example: make a field value lowercase and the first character uppercase:
 	 * 	['field_N' => ['strtolower', 'ucfirst']]
-	 * @return 	array 	generated filtered form data
 	 */
 	public function filter(){
-		// before filtering, always execute whitelisting and use the resulting data
-		if(!$this->_aFilteredData){
-			$this->_aFilteredData = $this->whitelist();
-		}
-
+		$this->_aFilteredData = $this->_aRawFormData;
 		// execute each single filter and remove it, meaning that you can only filter the data once
-		while($this->_aFieldFilters){
-			$aFldprcssr = array_shift($this->_aFieldFilters);
+		foreach($this->_aFieldFilters as $aFldprcssr){
 			$this->_execute_filter(
 				$aFldprcssr['field'],
 				$aFldprcssr['callable'],
 				$aFldprcssr['params']
 			);
 		}
+		$this->set_data($this->_aFilteredData);
+	}
 
-		// return the filtered data (is also stored as member)
-		return $this->_aFilteredData;
+	/**
+	 * Gets the filtered form data. Also removes csrf token value and is submitted value before
+	 * returning.
+	 * @return	array 	filtered form data array
+	 */
+	public function get_filtered_form_data(){
+		return array_diff_key(
+			$this->_aFilteredData,
+			array_flip([$this->_sCsrfTokenKey, $this->_sIsSubmittedKey])
+		);
 	}
 
 	/**
@@ -594,15 +698,6 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Get form errors.
-	 * @return	array	array with field errors (all error messages of invalid fields)
-	 */
-	public function get_errors(){
-		$this->set_data($this->filter());
-		return parent::get_errors();
-	}
-
-	/**
 	 * Get form id
 	 * @return 	string 	form id
 	 */
@@ -619,59 +714,21 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Get whitelisted fields
-	 * @return  array 	currently whitelisted fields
-	 */
-	public function get_whitelisted_fields(){
-		return $this->_aWhitelistedFields;
-	}
-
-	/**
 	 * Check if form has been submitted.
 	 * @return boolean 	form is submitted
 	 */
 	public function is_submitted(){
-		return $this->_check_token() && $this->_aFormData[$this->_sIsSubmittedKey];
+		return 
+			$this->_check_token() 
+			&& 
+			isset($this->_aRawFormData[$this->_sIsSubmittedKey])
+			&&
+			$this->_aRawFormData[$this->_sIsSubmittedKey]
+		;
 	}
 
-	/**
-	 * Check if form is valid.
-	 * @return boolean 	form is valid
-	 */
 	public function is_valid(){
-		if($this->is_submitted()){
-			$this->validate();
-			return !(bool)$this->get_errors();
-		}
-		return false;
-	}
-
-	/**
-	 * Create a html label tag. This is a mapping to ->field().
-	 * @param  string 	$sFieldId 	form field id label is related to
-	 * @param  array 	$aSettings 	tag settings
-	 * @return string            	generated html tag string
-	 */
-	public function label($sFieldId, $aSettings){
-		return $this->field($sFieldId, 'label', $aSettings);
-	}
-
-	/**
-	 * Overrides existing form data.
-	 * @param 	array 	$aData 	array of form data
-	 */
-	public function overwrite_input($aData){
-		$this->_aFormData = $this->_array_merge_recursive_ex($this->_aFormData, $aData);
-	}
-
-	/**
-	 * Clears data of a form field.
-	 * @param  [type] $sFieldId [description]
-	 */
-	public function clear_field_input($sFieldId){
-		if(isset($this->_aFormData[$sFieldId])){
-			unset($this->_aFormData[$sFieldId]);
-		}
+		return $this->is_submitted() && parent::is_valid();
 	}
 
 	/**
@@ -679,7 +736,7 @@ class BaseForm extends Validator{
 	 * @param 	mixed 	$mToken 	token value
 	 */
 	public function set_csrf_token($mToken){
-		$this->_sCrsfToken = $mToken;
+		$this->_sCsrfToken = $mToken;
 	}
 
 	/**
@@ -726,42 +783,6 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Validate the form.
-	 * @return	array 	array with field validations (boolean values of field keys)
-	 */
-	public function validate(){
-		$this->set_data($this->filter());
-		return parent::validate();
-	}
-
-	/**
-	 * Filter whitelisted fields, store and return resulting form data.
-	 * @return array 	whitelisted form data
-	 */
-	public function whitelist(){
-		// only do this once
-		if(!$this->_aWhitelistedData){
-
-			// get initial submitted form data
-			$this->_aWhitelistedData = $this->fetch_form_data();
-			
-			// start whitelisting only if any field has been specified for this
-			if($this->_aWhitelistedFields){
-				// always add csrf token and is submitted token
-				$this->_aWhitelistedFields[] = $this->_sCrsfTokenKey;
-				$this->_aWhitelistedFields[] = $this->_sIsSubmittedKey;
-				
-				// actual whitelisting by intersection
-				$this->_aWhitelistedData = array_intersect_key(
-					$this->_aWhitelistedData,
-					array_flip($this->_aWhitelistedFields)
-				);
-			}
-		}
-		return $this->_aWhitelistedData;
-	}
-
-	/**
 	 * Helper functino to merge arrays recursively.
 	 * @todo	EXPORT TO HELPER CLASS
 	 * @param   array 	&$array1	Array to merge into
@@ -785,15 +806,15 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Check crsf token. Returns true, if token is disabled (value === false) or if token value is
+	 * Check csrf token. Returns true, if token is disabled (value === false) or if token value is
 	 * matching submitted token field value.
 	 * @return	boolean 	csrf token matching
 	 */
 	private function _check_token(){
 		if(
-			$this->_sCrsfToken === false
+			$this->_sCsrfToken === false
 			||
-			$this->_aFormData[$this->_sCrsfTokenKey] === $this->_sCrsfToken
+			$this->_aRawFormData[$this->_sCsrfTokenKey] === $this->_sCsrfToken
 		){
 			return true;
 		}
@@ -818,30 +839,15 @@ class BaseForm extends Validator{
 	}
 
 	/**
-	 * Creates the name for a form field. Those are always put inside brackets after the form id,
-	 * just like a form array value. Technically it actually is, but it is autoimatically packed
-	 * and unpacked by this class.
-	 * @param 	string 	$sName 	name of form field
-	 * @return 	string        	created form field name
-	 */
-	private function _create_field_name($sName){
-		// if given name already is an array, put it into 2nd dimension		
-		if(preg_match('=(.+?)(\[.+)=', $sName, $aMatches)){
-			$sResult = $this->_sFormId . '[' . $aMatches[1] . ']' . $aMatches[2];
-		}else{
-			// otherwise just as form array
-			$sResult = $this->_sFormId . '[' . $sName . ']';
-		}
-		return $sResult;
-	}
-
-	/**
 	 * Escapes html string.
 	 * @param	string	$sS		string
 	 * @return	string			escaped string.
 	 */
-	private function _escape($sS) {
-		return htmlspecialchars($sS, ENT_QUOTES, 'utf-8');
+	private function _escape($sS){
+		if($this->_sEncoding !== false){
+			$sS = mb_convert_encoding($sS, $this->_sEncoding);
+		}
+		return htmlspecialchars($sS, ENT_QUOTES);
 	}
 
 	/**
@@ -853,16 +859,12 @@ class BaseForm extends Validator{
 	 */
 	private function _execute_filter($sFieldId, $sCallable, $aParams){
 		// check each param for field value references and replace them by its referenced value
-		foreach($aParams as $iKey => $mValue){
-			if($sFieldKey = $this->_get_masked_field_reference($mValue)){
-				$aParams[$iKey] = $this->ads_get($this->_aFilteredData, $sFieldKey, null);
-			}
-		}
+		$this->_decipher_masked_field_references($aParams, $this->_aFilteredData);
 		
 		// if given callable name is not a default php function
 		if(!is_callable($sCallable)){
 			// check if its a reference to a custom filter function
-			$sFiltername = $this->_get_masked_filter_reference($sCallable);
+			$sFiltername = ltrim($sCallable, '@');
 			if(isset($this->_aCustomFilters[$sFiltername])){
 				$sCallable = $this->_aCustomFilters[$sFiltername];
 			}else{
@@ -876,8 +878,8 @@ class BaseForm extends Validator{
 			}
 		}
 
-		// actually call the filter function and drictly put its result into the filtered form data
-		// member array
+		// finally call the filter function and directly put its result into the filtered form
+		// data member array
 		try{
 			$mResult = call_user_func_array($sCallable, $aParams);
 			$this->ads_set($this->_aFilteredData, $sFieldId, $mResult);
@@ -886,36 +888,16 @@ class BaseForm extends Validator{
 		}
 	}
 
-	/**
-	 * Gets the input from a single form field.
-	 * @param 	string 	$sName 	name of form field
-	 * @return 	mixed        	value of respective form field
-	 */
-	private function _get_field_input($sName){		
-		// default result is null in
-		$mResult = null;
-		
-		// transform given field name into array notation, since each form is treated as an array
-		$sInputKey = preg_replace('/\[[^]]*\]/', '', $sName);
-		
-		//	get the field value if existing
-		if(isset($this->_aFormData[$sInputKey])){
-			$mResult = $this->_aFormData[$sInputKey];
-		}
-		return $mResult;
+	private function _read_field_id($sFieldName){
+		$sResult = str_replace('[', '.', $sFieldName);
+		$sResult = str_replace(']', '', $sResult);
+		return $sResult;
 	}
-
-	/**
-	 * Check if filter callable is a masked filter name and return its unmasked name or otherwise
-	 * return false.
-	 * @param   $sFilter 	filter callable name
-	 * @return 	mixed 		unmasked filter callable name or false
-	 */
-	private function _get_masked_filter_reference($sFilter){
-		$sPattern = '=^@(.+?)$=';
-		if(is_string($sFilter) && preg_match($sPattern, $sFilter)){
-			return preg_replace($sPattern, '$1', $sFilter);
-		}
-		return false;
+	private function _name_to_field_id($sName){
+		return rtrim($this->_read_field_id($sName), '.');
+	}
+	private function _normalize_field_name($sInput){
+		$sResult = $this->_read_field_id($sInput);
+		return $this->_sFormId . '[' . str_replace('.', '][', $sResult) . ']';
 	}
 }
