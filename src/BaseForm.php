@@ -104,7 +104,7 @@ class BaseForm extends Validator{
 	 * Key of hidden csrf token field.
 	 * @var string
 	 */
-	private $_sCsrfTokenKey = '::csrf_token';
+	private $_sCsrfTokenKey = '__csrf_token__';
 
 	/**
 	 * Value of csrf token. If false, it will be ignored.
@@ -116,7 +116,7 @@ class BaseForm extends Validator{
 	 * Key of hidden submitted field.
 	 * @var string
 	 */
-	private $_sIsSubmittedKey = '::is_submitted';
+	private $_sIsSubmittedKey = '__is_submitted__';
 	
 	/**
 	 * Callback to manipulate inner html output, for example for the sake of i18n.
@@ -493,12 +493,11 @@ class BaseForm extends Validator{
 
 		// get raw form data, from $_POST/$_GET
 		$aRawFormData = [];
-		if(isset($_REQUEST[$this->_sFormId])){
-			$aRawFormData = 
-				$this->_sFormSubmitMethod === 'POST'
-				? $_POST[$this->_sFormId]
-				: $_GET[$this->_sFormId]
-			;
+		if($this->_sFormSubmitMethod === 'POST' && isset($_POST[$this->_sFormId])){
+			$aRawFormData = $_POST[$this->_sFormId];
+		}
+		if($this->_sFormSubmitMethod === 'GET' && isset($_GET[$this->_sFormId])){
+			$aRawFormData = $_GET[$this->_sFormId];
 		}
 
 		// get additional data from $_FILES and put them into form data
