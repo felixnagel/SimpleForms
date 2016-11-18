@@ -7,7 +7,6 @@ use LuckyNail\Simple\ArrayDotSyntax;
 abstract class BaseValidator{
 	use ArrayDotSyntax;
 
-
 	/**
 	 * Flag stating, if data has been validated yet
 	 * @var boolean
@@ -82,7 +81,13 @@ abstract class BaseValidator{
 	 */
 	public function add_validators($aSettings){
 		foreach($aSettings as $sField => $aValidators){
-			$this->_aVldtrs[$sField] = $this->_normalize_cnfg_arr($aValidators);
+			if(!is_array($this->_aVldtrs[$sField])){
+				$this->_aVldtrs[$sField] = [];
+			}
+			$this->_aVldtrs[$sField] = array_merge(
+				$this->_aVldtrs[$sField],
+				$this->_normalize_cnfg_arr($aValidators)
+			);
 		}
 	}
 
