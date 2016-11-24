@@ -116,7 +116,7 @@ class Form extends BaseForm{
 		return preg_replace('=[^0-9]=', '', $sValue);
 	}
 	protected function __filter__rdws($sVal){
-		return preg_replace('=\s+=', ' ', $sVal);
+		return preg_replace('=\s\s+=', ' ', $sVal);
 	}
 	protected function __filter__name($sVal){
 		$sVal = ucwords(strtolower(trim($sVal)));
