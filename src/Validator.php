@@ -158,9 +158,9 @@ class Validator extends BaseValidator{
 		return is_numeric($sValue);
 	}
 	protected function __validator__numwords_range($sValue, $sInterval){
-		$sTemp = preg_replace('=[^ \pL\pN\s]+=u', '', strtolower($sValue));
-    	$sTemp = trim(preg_replace('=[ \s]+=u', ' ', $sTemp));
-	    $iCount = count(explode(' ', $sTemp));
+		$sValue = preg_replace('=\s\s+=', ' ', $sValue);
+		$sValue = trim($sValue);
+	    $iCount = count(explode(' ', $sValue));
 
 		if(is_numeric($sInterval)){
 			return $iCount == $sInterval;
