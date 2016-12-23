@@ -81,7 +81,7 @@ abstract class BaseValidator{
 	 */
 	public function add_validators($aSettings){
 		foreach($aSettings as $sField => $aValidators){
-			if(!is_array($this->_aVldtrs[$sField])){
+			if(!isset($this->_aVldtrs[$sField])){
 				$this->_aVldtrs[$sField] = [];
 			}
 			$this->_aVldtrs[$sField] = array_merge(
