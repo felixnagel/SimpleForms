@@ -858,7 +858,7 @@ class BaseForm extends Validator{
 	 */
 	private function _execute_filter($sFieldId, $sCallable, $aParams){
 		// check each param for field value references and replace them by its referenced value
-		$this->_decipher_masked_field_references($aParams, $this->_aFilteredData);
+		$this->_decipher_masked_field_references_rec($aParams, $this->_aFilteredData);
 		
 		// if given callable name is not a default php function
 		if(!is_callable($sCallable)){

@@ -49,7 +49,7 @@ abstract class BaseValidator{
 	 */
 	private $_aData = [];
 
-	private $_sMaskParamPattern = '=^~\{(.+?)\}~$=';
+	private $_sMaskParamPattern = '=~\{(.+?)\}~=';
 	private $_sMastParamProto = '~{%s}~';
 
 	/**
@@ -81,7 +81,7 @@ abstract class BaseValidator{
 	 */
 	public function add_validators($aSettings){
 		foreach($aSettings as $sField => $aValidators){
-			if(!isset($this->_aVldtrs[$sField])){
+			if(!is_array($this->_aVldtrs[$sField])){
 				$this->_aVldtrs[$sField] = [];
 			}
 			$this->_aVldtrs[$sField] = array_merge(
@@ -182,16 +182,36 @@ abstract class BaseValidator{
 		return $aVldtrDef;
 	}
 
-
-	protected function _decipher_masked_field_references(&$sParamDefinition, $aSource){
-		if(is_array($sParamDefinition)){
-			foreach($sParamDefinition as &$sParamDefinitionPart){
-				$sParamDefinition = &$sParamDefinitionPart;
-				$this->_decipher_masked_field_references($sParamDefinition, $aSource);
+	/**
+	 * Recursively searches a string for occurencies if masked field references and replaces them
+	 * by their respective values.
+	 * @param	mixed 	&$sCheck 	String or Array	to check. Taken by reference!
+	 * @param  	array 	$aSource 	Data source array to get replacements from.
+	 */
+	protected function _decipher_masked_field_references_rec(&$sCheck, $aSource){
+		// Only proceed if given value may be checked.
+		if(!is_array($sCheck) && !is_scalar($sCheck)){
+			return;
+		}
+		// If given value is array, enter recursion.
+		if(is_array($sCheck)){
+			foreach($sCheck as &$sParamDefinitionPart){
+				$sCheck = &$sParamDefinitionPart;
+				$this->_decipher_masked_field_references_rec($sCheck, $aSource);
 			}
 		}else{
-			if(preg_match($this->_sMaskParamPattern, $sParamDefinition, $aMatches)){
-				$sParamDefinition = $this->ads_get($aSource, $aMatches[1]);
+			// Replace each single found reference (multiple possible).
+			while(preg_match($this->_sMaskParamPattern, $sCheck, $aMatches)){
+				// Check, if given reference is part of a string or is the string itself.
+				// If its the string itself, set this flag to false to avoid casting the
+				// replacement value to string when it actually isnt.
+				$bTreatAsString = strlen($aMatches[0]) != strlen($sCheck);
+				$mReplacement = $this->ads_get($aSource, $aMatches[1]);
+				if($bTreatAsString){
+					$sCheck = str_replace($aMatches[0], $mReplacement, $sCheck);
+				}else{
+					$sCheck = $mReplacement;
+				}
 			}	
 		}
 	}
@@ -206,7 +226,7 @@ abstract class BaseValidator{
 	 */
 	protected function _execute_validator($sVldtrName, $mInputValue, $mVldtrParams, $sFieldId){
 		// check each param for field value references and replace them by its referenced value
-		$this->_decipher_masked_field_references($mVldtrParams, $this->_aData);
+		$this->_decipher_masked_field_references_rec($mVldtrParams, $this->_aData);
 
 		// check if given validator name refers to a default validator
 		$sExistingVldtr	= '__validator__' . $sVldtrName;
@@ -230,10 +250,10 @@ abstract class BaseValidator{
 	/**
 	 * Creates the fitting error message and inserts it into errors member.
 	 * @param 	string 	$sFieldId		form field id
+	 * @param  	mixed 	$mInputValue 	field input value
 	 * @param  	string 	$sVldtrName 	name of validator
-	 * @param  	mixed 	$mVldtrParams 	parameters of validator
 	 */
-	protected function _insert_error_message($sFieldId, $sVldtrName, $mVldtrParams){
+	protected function _insert_error_message($sFieldId, $mInputValue, $sVldtrName){
 		// check if there is a more specific error message specified with array dor syntax
 		$sMessage = $sFieldId.'.'.$sVldtrName;
 		if(isset($this->_aVldtrErrMsg[$sFieldId.'.'.$sVldtrName])){
@@ -242,14 +262,8 @@ abstract class BaseValidator{
 		elseif(isset($this->_aVldtrErrMsg[$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sVldtrName];
 		}
-
-		// cast validator parameters to string in order to be able to print them as part of the
-		// error message
-		if(!is_scalar($mVldtrParams)){
-			$sVldtrParams = json_encode($mVldtrParams);
-		}else{
-			$sVldtrParams = (string)$mVldtrParams;
-		}
+		
+		$this->_decipher_masked_field_references_rec($sMessage, $this->_aData);
 
 		// add error message to member
 		$this->_aErrors[$sFieldId][] = sprintf($sMessage, $sVldtrParams);		
@@ -292,7 +306,7 @@ abstract class BaseValidator{
 			if(!$bIsValid){
 				$bFieldIsValid = false;
 				foreach($aInvldtdFields as $sInvldtdField){
-					$this->_insert_error_message($sInvldtdField, $sVldtrName, $mVldtrParams);
+					$this->_insert_error_message($sInvldtdField, $mInputValue, $sVldtrName);
 				}
 				// is quick flag is set, break validation iteration right here
 				if($this->_bQuick){
@@ -300,7 +314,6 @@ abstract class BaseValidator{
 				}
 			}
 		}
-
 		return $bFieldIsValid;
 	}
 
