@@ -6,7 +6,6 @@ use LuckyNail\Simple\ArrayDotSyntax;
 
 abstract class BaseValidator{
 	use ArrayDotSyntax;
-
 	/**
 	 * Flag stating, if data has been validated yet
 	 * @var boolean
@@ -261,6 +260,11 @@ abstract class BaseValidator{
 		}
 		elseif(isset($this->_aVldtrErrMsg[$sVldtrName])){
 			$sMessage = $this->_aVldtrErrMsg[$sVldtrName];
+		}
+		
+		if(is_scalar($mInputValue)){
+			$sCurrentValueMask = $this->_mask_field_reference('INPUT');
+			$sMessage = str_replace($sCurrentValueMask, $mInputValue, $sMessage);
 		}
 		
 		$this->_decipher_masked_field_references_rec($sMessage, $this->_aData);
