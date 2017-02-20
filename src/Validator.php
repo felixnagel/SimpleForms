@@ -4,26 +4,25 @@ namespace LuckyNail\SimpleForms;
 
 class Validator extends BaseValidator{
 	protected $_aVldtrErrMsg = [
-		'array'          => 'VALIDATOR_ARRAY',
-		'count'          => 'VALIDATOR_COUNT',
-		'date'           => 'VALIDATOR_DATE',
-		'date_after'     => 'VALIDATOR_DATE_AFTER',
-		'date_before'    => 'VALIDATOR_DATE_BEFORE',
-		'email'          => 'VALIDATOR_EMAIL',
-		'eq'             => 'VALIDATOR_EQUAL',
-		'eq_strict'      => 'VALIDATOR_EQUAL_STRICT',
-		'fl_range'       => 'VALIDATOR_FL_RANGE',
-		'imagetype'      => 'VALIDATOR_IMAGETYPE',
-		'in'             => 'VALIDATOR_IN',
-		'in_strict'      => 'VALIDATOR_IN_STRICT',
-		'int'            => 'VALIDATOR_INT',
-		'numeric'        => 'VALIDATOR_NUMERIC',
-		'numwords_range' => 'VALIDATOR_NUMWORDS_RANGE',
-		'regex'          => 'VALIDATOR_REGEX',
-		'required'       => 'VALIDATOR_REQUIRED',
-		'strlen_range'   => 'VALIDATOR_STRING_RANGE',
-		'upload'         => 'VALIDATOR_UPLOAD',
-		'url'            => 'VALIDATOR_URL',
+		'array'       => 'VALIDATOR_ARRAY',
+		'count'       => 'VALIDATOR_COUNT',
+		'date'        => 'VALIDATOR_DATE',
+		'date_after'  => 'VALIDATOR_DATE_AFTER',
+		'date_before' => 'VALIDATOR_DATE_BEFORE',
+		'email'       => 'VALIDATOR_EMAIL',
+		'eq'          => 'VALIDATOR_EQUAL',
+		'eq_strict'   => 'VALIDATOR_EQUAL_STRICT',
+		'fl_range'    => 'VALIDATOR_FL_RANGE',
+		'imagetype'   => 'VALIDATOR_IMAGETYPE',
+		'in'          => 'VALIDATOR_IN',
+		'in_strict'   => 'VALIDATOR_IN_STRICT',
+		'int'         => 'VALIDATOR_INT',
+		'numeric'     => 'VALIDATOR_NUMERIC',
+		'regex'       => 'VALIDATOR_REGEX',
+		'required'    => 'VALIDATOR_REQUIRED',
+		'strlen'      => 'VALIDATOR_STRING_RANGE',
+		'upload'      => 'VALIDATOR_UPLOAD',
+		'url'         => 'VALIDATOR_URL',
 	];
 	protected function __validator__array($aValue, $aVldtrDef = [], $sFieldId){
 		if(!is_null($aValue) && !is_array($aValue)){
@@ -157,56 +156,25 @@ class Validator extends BaseValidator{
 	protected function __validator__numeric($sValue){
 		return is_numeric($sValue);
 	}
-	protected function __validator__numwords_range($sValue, $sInterval){
-		$sValue = preg_replace('=\s\s+=', ' ', $sValue);
-		$sValue = trim($sValue);
-	    $iCount = count(explode(' ', $sValue));
-
-		if(is_numeric($sInterval)){
-			return $iCount == $sInterval;
-		}
-
-		if(preg_match_all('=^(\d*)\s*\,\s*(\d*)$=', $sInterval, $aMatches)){
-			$iMin = $aMatches[1][0];
-			if(is_numeric($iMin)){
-				$iMin = (int)$iMin;
-				if($iCount < $iMin){
-					return false;
-				}
-			}
-			$iMax = $aMatches[2][0];
-			if(is_numeric($iMax)){
-				$iMax = (int)$iMax;
-				if($iCount > $iMax){
-					return false;
-				}
-			}
-		}else{
-			return false;
-		}
-		return true;		
-	}	
 	protected function __validator__regex($sValue, $sPattern){
 		return (bool)preg_match($sPattern, $sValue) ;
 	}
 	protected function __validator__required($sValue){
 		return !($sValue === null || $sValue === '' || !count($sValue));
 	}
-	protected function __validator__strlen_range($sValue, $sInterval){
+	protected function __validator__strlen($sValue, $sInterval){
 		if(is_numeric($sInterval)){
 			return strlen($sValue) == $sInterval;
 		}
 		if(preg_match_all('=^(\d*)\s*\,\s*(\d*)$=', $sInterval, $aMatches)){
-			$iMin = $aMatches[1][0];
-			if(is_numeric($iMin)){
-				$iMin = (int)$iMin;
+			$iMin = (int)$aMatches[1][0];
+			if($iMin){
 				if(strlen($sValue) < $iMin){
 					return false;
 				}
 			}
-			$iMax = $aMatches[2][0];
-			if(is_numeric($iMax)){
-				$iMax = (int)$iMax;
+			$iMax = (int)$aMatches[2][0];
+			if($iMax){
 				if(strlen($sValue) > $iMax){
 					return false;
 				}

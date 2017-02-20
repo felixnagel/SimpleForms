@@ -227,6 +227,11 @@ abstract class BaseValidator{
 		// check each param for field value references and replace them by its referenced value
 		$this->_decipher_masked_field_references_rec($mVldtrParams, $this->_aData);
 
+		// do not check empty fields when validator is not 'required'
+		if($sVldtrName !== 'required' && is_string($mInputValue) && $mInputValue === ''){
+			return true;
+		}
+
 		// check if given validator name refers to a default validator
 		$sExistingVldtr	= '__validator__' . $sVldtrName;
 		if(method_exists($this, $sExistingVldtr)){

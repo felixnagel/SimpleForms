@@ -246,6 +246,10 @@ class BaseForm extends Validator{
 			$this->add_default_values($aSettings['default_values']);
 		}
 
+		if(isset($aSettings['custom_filter_functions'])){
+			$this->add_custom_filter_functions($aSettings['custom_filter_functions']);
+		}
+
 		if(isset($aSettings['filters'])){
 			$this->add_filters($aSettings['filters']);
 		}
@@ -843,10 +847,7 @@ class BaseForm extends Validator{
 	 * @return	string			escaped string.
 	 */
 	private function _escape($sS){
-		if($this->_sEncoding !== false){
-			$sS = mb_convert_encoding($sS, $this->_sEncoding);
-		}
-		return htmlspecialchars($sS, ENT_QUOTES);
+		return htmlspecialchars($sS, ENT_QUOTES, $this->_sEncoding);
 	}
 
 	/**
