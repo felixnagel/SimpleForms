@@ -227,11 +227,6 @@ abstract class BaseValidator{
 		// check each param for field value references and replace them by its referenced value
 		$this->_decipher_masked_field_references_rec($mVldtrParams, $this->_aData);
 
-		// do not check empty fields when validator is not 'required'
-		if($sVldtrName !== 'required' && is_string($mInputValue) && $mInputValue === ''){
-			return true;
-		}
-
 		// check if given validator name refers to a default validator
 		$sExistingVldtr	= '__validator__' . $sVldtrName;
 		if(method_exists($this, $sExistingVldtr)){
@@ -292,10 +287,22 @@ abstract class BaseValidator{
 			$aInvldtdFields = [$sFieldId];
 		}
 
+		// keep flag to remember from when current field is considered as required
+		$bIsRequired = false;
+
 		// loop through all defined validators and execute them one by one, a single failing
 		// validator causes the field to be invalid
 		$bFieldIsValid = true;
 		foreach($aVldtrDef as $sVldtrName => $mVldtrParams){
+			if($sVldtrName === 'required'){
+				$bIsRequired = true;
+			}
+
+			// ignore this validator if field is empty and not required (yet)
+			if(!$bIsRequired && ($mInputValue === '' || $mInputValue === [])){
+				continue;
+			}
+
 			// check if defined validator is negated and keep a flag
 			$sVldtrName = str_replace('!', '', $sVldtrName, $iNegation);
 			
@@ -351,4 +358,5 @@ abstract class BaseValidator{
 	protected function _mask_field_reference($sFieldId){
 		return sprintf($this->_sMastParamProto, $sFieldId);
 	}
+
 }
