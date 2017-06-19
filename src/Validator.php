@@ -25,11 +25,12 @@ class Validator extends BaseValidator{
 		'upload'         => 'VALIDATOR_UPLOAD',
 		'url'            => 'VALIDATOR_URL',
 	];
-	protected function __validator__array($aValue, $aVldtrDef = [], $sFieldId){
+	protected function __validator__array($aValue, $mVldtrDef = [], $sFieldId){
 		if(!is_null($aValue) && !is_array($aValue)){
 			return false;
 		}
 		$bResult = true;
+		$aVldtrDef = $this->_normalize_cnfg_arr($mVldtrDef);
 		foreach($aValue as $mValue){
 			$bIsValid = $this->_validate_single_field($sFieldId, $mValue, $aVldtrDef);
 			if(!$bIsValid){
