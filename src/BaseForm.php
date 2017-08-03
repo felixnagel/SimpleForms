@@ -509,29 +509,16 @@ class BaseForm extends Validator{
 			$aFileData = $_FILES[$this->_sFormId];
 			foreach($aFileData as $sFileKey => $aFields){
 				foreach($aFields as $sField => $sValue){
-					if(!isset($aRawFormData[$sField])){
-						$aRawFormData[$sField] = [];
-					}
-					if(
-						!in_array($sFileKey, ['name', 'type', 'tmp_name', 'error', 'size'])
-						||
-						$sFileKey === 'error' && $sValue !== 0
-						||
-						$sFileKey === 'name' && $sValue === ''
-						||
-						$sFileKey === 'size' && $sValue === 0
-						||
-						$sFileKey === 'tmp_name' && $sValue === ''
-						||
-						$sFileKey === 'type' && $sValue === ''
-					){
-						continue;
-					}
 					$aRawFormData[$sField][$sFileKey] = $sValue;
 				}
 			}
+			foreach($aRawFormData as $sField => $mValue){
+				if($mValue === ['name' => '', 'type' => '', 'tmp_name' => '', 'error' => 4, 'size' => 0,]){
+					$aRawFormData[$sField] = '';
+				}
+			}
 		}
-		
+
 		// only store non-empty array as form data member because it has to stay an array value and
 		// otherwise it would be overriden with null in some cases
 		if($aRawFormData){
