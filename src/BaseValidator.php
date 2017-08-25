@@ -1,9 +1,6 @@
 <?php
-
 namespace LuckyNail\SimpleForms;
-
 use LuckyNail\Simple\ArrayDotSyntax;
-
 abstract class BaseValidator{
 	use ArrayDotSyntax;
 	/**
@@ -358,5 +355,4 @@ abstract class BaseValidator{
 	protected function _mask_field_reference($sFieldId){
 		return sprintf($this->_sMastParamProto, $sFieldId);
 	}
-
 }

@@ -1,7 +1,5 @@
 <?php
-
 namespace LuckyNail\SimpleForms;
-
 class BaseForm extends Validator{
 	/**
 	 * Form Id. Will be printed into id-attribute and be used as name for form data array.
@@ -429,13 +427,15 @@ class BaseForm extends Validator{
 		foreach(array_intersect(['checked', 'selected'], $aAttrTags) as $sAttr){
 			if(!isset($aAttr[$sAttr])){
 				// check for specific value or in_array because field may be array field (multiple)
+				$mTmp = $this->ads_get($this->_aRawFormData, $sFieldId);
 				if(
-					$aAttr['value'] == $this->ads_get($this->_aRawFormData, $sFieldId)
+					$aAttr['value'] == $mTmp
 					||
-					in_array($aAttr['value'], $this->ads_get($this->_aRawFormData, $sFieldId))
+					is_array($mTmp) && in_array($aAttr['value'], $mTmp)
 				){
 					$aAttr[$sAttr] = $sAttr;
 				}
+				$mTmp = null;
 			}
 		}
 

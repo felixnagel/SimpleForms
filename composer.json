@@ -10,7 +10,7 @@
         }
     ],
     "require": {
-        "luckynail/simple": "0.0.*"
+        "luckynail/simple": "*"
     },
     "require-dev": {},
     "autoload": {
