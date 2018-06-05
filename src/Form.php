@@ -1,6 +1,6 @@
 <?php
 
-namespace LuckyNail\SimpleForms;
+namespace Core\SimpleForms;
 
 class Form extends BaseForm{
 	public function __construct($aSettings = []){

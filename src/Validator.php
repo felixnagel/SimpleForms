@@ -1,29 +1,30 @@
 <?php
 
-namespace LuckyNail\SimpleForms;
+namespace Core\SimpleForms;
 
 class Validator extends BaseValidator{
 	protected $_aVldtrErrMsg = [
-		'array'          => 'VALIDATOR_ARRAY',
-		'count'          => 'VALIDATOR_COUNT',
-		'date'           => 'VALIDATOR_DATE',
-		'date_after'     => 'VALIDATOR_DATE_AFTER',
-		'date_before'    => 'VALIDATOR_DATE_BEFORE',
-		'email'          => 'VALIDATOR_EMAIL',
-		'eq'             => 'VALIDATOR_EQUAL',
-		'eq_strict'      => 'VALIDATOR_EQUAL_STRICT',
-		'fl_range'       => 'VALIDATOR_FL_RANGE',
-		'imagetype'      => 'VALIDATOR_IMAGETYPE',
-		'in'             => 'VALIDATOR_IN',
-		'in_strict'      => 'VALIDATOR_IN_STRICT',
-		'int'            => 'VALIDATOR_INT',
-		'numeric'        => 'VALIDATOR_NUMERIC',
-		'numwords_range' => 'VALIDATOR_NUMWORDS_RANGE',
-		'regex'          => 'VALIDATOR_REGEX',
-		'required'       => 'VALIDATOR_REQUIRED',
-		'strlen_range'   => 'VALIDATOR_STRING_RANGE',
-		'upload'         => 'VALIDATOR_UPLOAD',
-		'url'            => 'VALIDATOR_URL',
+		'array'            => 'VALIDATOR_ARRAY',
+		'consists_of_keys' => 'VALIDATOR_CONSISTS_OF_KEYS',
+		'count'            => 'VALIDATOR_COUNT',
+		'date'             => 'VALIDATOR_DATE',
+		'date_after'       => 'VALIDATOR_DATE_AFTER',
+		'date_before'      => 'VALIDATOR_DATE_BEFORE',
+		'email'            => 'VALIDATOR_EMAIL',
+		'eq'               => 'VALIDATOR_EQUAL',
+		'eq_strict'        => 'VALIDATOR_EQUAL_STRICT',
+		'fl_range'         => 'VALIDATOR_FL_RANGE',
+		'imagetype'        => 'VALIDATOR_IMAGETYPE',
+		'in'               => 'VALIDATOR_IN',
+		'in_strict'        => 'VALIDATOR_IN_STRICT',
+		'int'              => 'VALIDATOR_INT',
+		'numeric'          => 'VALIDATOR_NUMERIC',
+		'numwords_range'   => 'VALIDATOR_NUMWORDS_RANGE',
+		'regex'            => 'VALIDATOR_REGEX',
+		'required'         => 'VALIDATOR_REQUIRED',
+		'strlen_range'     => 'VALIDATOR_STRING_RANGE',
+		'upload'           => 'VALIDATOR_UPLOAD',
+		'url'              => 'VALIDATOR_URL',
 	];
 	protected function __validator__array($aValue, $mVldtrDef = [], $sFieldId){
 		if(!is_null($aValue) && !is_array($aValue)){
@@ -46,26 +47,32 @@ class Validator extends BaseValidator{
 		return $iCount === count($sValue);
 	}
 	protected function __validator__date($sValue, $sFormat = 'Y-m-d'){
-		$oDate = DateTime::createFromFormat($sFormat, $sValue);
+		$oDate = \DateTime::createFromFormat($sFormat, $sValue);
     	return $oDate && $oDate->format($sFormat) === $sValue;
 	}
-	protected function __validator__date_after($sValue, $sCompare, $sFormat = 'Y-m-d'){
-		$oDateVal = DateTime::createFromFormat($sFormat, $sValue);
+	protected function __validator__date_after($sValue, $aParams){
+		$sCompare = $aParams[0];
+		$sFormat = $aParams[1] ?: 'Y-m-d';
+
+		$oDateVal = \DateTime::createFromFormat($sFormat, $sValue);
 		if(!$oDateVal || $oDateVal->format($sFormat) !== $sValue){
 			return false;
 		}
-		$oDateCompare = DateTime::createFromFormat($sFormat, $sCompare);
+		$oDateCompare = \DateTime::createFromFormat($sFormat, $sCompare);
 		if(!$oDateCompare || $oDateCompare->format($sFormat) !== $sCompare){
 			return false;
 		}
 		return $oDateVal > $oDateCompare;
 	}
-	protected function __validator__date_before($sValue, $sCompare, $sFormat = 'Y-m-d'){
-		$oDateVal = DateTime::createFromFormat($sFormat, $sValue);
+	protected function __validator__date_before($sValue, $aParams){
+		$sCompare = $aParams[0];
+		$sFormat = $aParams[1] ?: 'Y-m-d';
+
+		$oDateVal = \DateTime::createFromFormat($sFormat, $sValue);
 		if(!$oDateVal || $oDateVal->format($sFormat) !== $sValue){
 			return false;
 		}
-		$oDateCompare = DateTime::createFromFormat($sFormat, $sCompare);
+		$oDateCompare = \DateTime::createFromFormat($sFormat, $sCompare);
 		if(!$oDateCompare || $oDateCompare->format($sFormat) !== $sCompare){
 			return false;
 		}
@@ -148,6 +155,9 @@ class Validator extends BaseValidator{
 	}	
 	protected function __validator__in($sValue, $aHaystack){
 		return in_array($sValue, $aHaystack);
+	}
+	protected function __validator__consists_of_keys($aValue, $aHaystack){
+		return count($aHaystack) == count(array_intersect_key(array_flip($aHaystack), $aValue));
 	}
 	protected function __validator__in_strict($sValue, $aHaystack){
 		return in_array($sValue, $aHaystack, true);

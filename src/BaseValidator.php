@@ -1,6 +1,6 @@
 <?php
-namespace LuckyNail\SimpleForms;
-use LuckyNail\Simple\ArrayDotSyntax;
+namespace Core\SimpleForms;
+use Core\Simple\ArrayDotSyntax;
 abstract class BaseValidator{
 	use ArrayDotSyntax;
 	/**

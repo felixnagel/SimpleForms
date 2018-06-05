@@ -1,5 +1,6 @@
 <?php
-namespace LuckyNail\SimpleForms;
+
+namespace Core\SimpleForms;
 class BaseForm extends Validator{
 	/**
 	 * Form Id. Will be printed into id-attribute and be used as name for form data array.
@@ -177,6 +178,8 @@ class BaseForm extends Validator{
 		'range'          => ['class', 'id', 'name', 'type', 'value',],
 		'search'         => ['class', 'id', 'name', 'type', 'value',],
 		'select'         => ['class', 'id', 'name', 'multiple',],
+		'submit'         => ['class', 'id',  'name', 'value',],
+		'submit'         => ['class', 'id',  'name', 'value',],
 		'tel'            => ['class', 'id', 'name', 'type', 'value',],
 		'text'           => ['class', 'id', 'name', 'type', 'value',],
 		'textarea'       => ['class', 'id', 'name',],
@@ -262,6 +265,7 @@ class BaseForm extends Validator{
 		$this->_aRawFormData = $aRawData;
 		$this->_aFilteredData = $aRawData;
 		$this->set_data($aRawData);
+		return $this;
 	}
 
 	/**
@@ -270,6 +274,7 @@ class BaseForm extends Validator{
 	 */
 	public function add_custom_filter_functions($aNewCustomFilters){
 		$this->_aCustomFilters = array_merge($this->_aCustomFilters, $aNewCustomFilters);
+		return $this;
 	}
 
 	/**
@@ -278,7 +283,16 @@ class BaseForm extends Validator{
 	 * @param 	array 	$aData 	array of form data
 	 */
 	public function add_default_values($aData){
-		$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aData);
+		// Transform input from ADS to normal Array
+		$aDataTransformed = [];
+		foreach($aData as $mKey => $mValue){
+			$this->ads_set($aDataTransformed, $mKey, $mValue);
+		}
+
+		// Merge data with existing default data
+		$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aDataTransformed);
+		#$this->_aDefaultData = $this->_array_merge_recursive_ex($this->_aDefaultData, $aData);
+		return $this;
 	}
 
 	public function publish_filtered_values($aFieldNames){
@@ -289,6 +303,7 @@ class BaseForm extends Validator{
 			$this->ads_set($this->_aRawFormData, $sFieldName, $this->_aFilteredData[$sFieldName]);
 		}
 		$this->set_data($this->_aRawFormData);	
+		return $this;
 	}
 
 	/**
@@ -303,7 +318,7 @@ class BaseForm extends Validator{
 		$aResult = [];
 		foreach($this->_aVldtrErrMsg as $sKey => $sMessage){
 			$aResult[$sKey] = call_user_func_array(
-				$this->_fInnerHtmlCallback, [$this->_sFormId, 'error', $sMessage]
+				$this->_fInnerHtmlCallback, [$this->_sFormId, $sMessage, 'error']
 			);
 		}
 		return $aResult;
@@ -341,6 +356,7 @@ class BaseForm extends Validator{
 				$this->_aFieldFilters[] = $aSet;
 			}
 		}
+		return $this;
 	}
 
 	/**
@@ -354,7 +370,7 @@ class BaseForm extends Validator{
 		}
 		$this->_aWhitelistedFields = array_merge($this->_aWhitelistedFields, $aWhitelistedFields);
 		array_unique($this->_aWhitelistedFields);
-		return $this->_aWhitelistedFields;
+		return $this;
 	}
 
 	/**
@@ -428,6 +444,7 @@ class BaseForm extends Validator{
 			if(!isset($aAttr[$sAttr])){
 				// check for specific value or in_array because field may be array field (multiple)
 				$mTmp = $this->ads_get($this->_aRawFormData, $sFieldId);
+
 				if(
 					$aAttr['value'] == $mTmp
 					||
@@ -507,9 +524,18 @@ class BaseForm extends Validator{
 		// get additional data from $_FILES and put them into form data
 		if(isset($_FILES[$this->_sFormId])){
 			$aFileData = $_FILES[$this->_sFormId];
+
 			foreach($aFileData as $sFileKey => $aFields){
-				foreach($aFields as $sField => $sValue){
-					$aRawFormData[$sField][$sFileKey] = $sValue;
+				$sFieldSub = null;
+				foreach($aFields as $sField => $mValue){
+					if(is_array($mValue)){
+						foreach($mValue as $sFieldSub => $sValue){
+							$aRawFormData[$sField][$sFieldSub][$sFileKey] = $sValue;
+						}
+					}else{
+						$sValue = $mValue;
+						$aRawFormData[$sField][$sFileKey] = $sValue;
+					}
 				}
 			}
 			foreach($aRawFormData as $sField => $mValue){
@@ -621,7 +647,7 @@ class BaseForm extends Validator{
 		){
 			$sInnerHtml = call_user_func_array(
 				$this->_fInnerHtmlCallback,
-				[$this->_sFormId, $sType, $sInnerHtml]
+				[$this->_sFormId, $sInnerHtml, $sType]
 			);
 		}	
 
@@ -675,6 +701,7 @@ class BaseForm extends Validator{
 			);
 		}
 		$this->set_data($this->_aFilteredData);
+		return $this;
 	}
 
 	/**
@@ -745,6 +772,7 @@ class BaseForm extends Validator{
 	 */
 	public function set_csrf_token($mToken){
 		$this->_sCsrfToken = $mToken;
+		return $this;
 	}
 
 	/**
@@ -753,6 +781,7 @@ class BaseForm extends Validator{
 	 */
 	public function set_css_error_class($sErrorClass){
 		$this->_sCssErrorClass = $sErrorClass;
+		return $this;
 	}
 
 	/**
@@ -761,6 +790,7 @@ class BaseForm extends Validator{
 	 */
 	public function set_default_attr($aSettings){
 		$this->_aDefaultAttr = $this->_array_merge_recursive_ex($this->_aDefaultAttr, $aSettings);
+		return $this;
 	}
 
 	/**
@@ -769,6 +799,7 @@ class BaseForm extends Validator{
 	 */
 	public function set_enctype($sEnctype){
 		$this->_sEnctype = $sEnctype;
+		return $this;
 	}
 
 	/**
@@ -777,6 +808,7 @@ class BaseForm extends Validator{
 	 */
 	public function set_id($sFormIdentifier){
 		$this->_sFormId = $sFormIdentifier;
+		return $this;
 	}
 
 	/**
@@ -788,6 +820,7 @@ class BaseForm extends Validator{
 			throw new Exception('Given string must be of "POST" or "GET".');
 		}
 		$this->_sFormSubmitMethod = $sFormSubmitMethod;
+		return $this;
 	}
 
 	/**
@@ -839,9 +872,7 @@ class BaseForm extends Validator{
 		$sAttr = '';
 		foreach($aAttr as $sAttrName => $sAttrValue){
 			$sAttr .= ' '.$sAttrName;
-			if($sAttrValue){
-				$sAttr .= '="'.$this->_escape($sAttrValue).'"';
-			}
+			$sAttr .= '="'.$this->_escape($sAttrValue).'"';
 		}
 		return $sAttr;		
 	}
